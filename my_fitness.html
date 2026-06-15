@@ -312,7 +312,7 @@ function renderDashboard() {
     </div>
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <div class="card-title" style="margin-bottom:0;">Calories & protein — last 10 days</div>
+        <div class="card-title" style="margin-bottom:0;">10 Day Macros</div>
         <div style="display:flex;gap:10px;font-size:11px;color:#888;">
           <span><span style="display:inline-block;width:10px;height:10px;background:#378ADD;border-radius:2px;margin-right:3px;"></span>Calories</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:#1D9E75;border-radius:2px;margin-right:3px;"></span>Protein ×10</span>
@@ -327,7 +327,20 @@ function renderDashboard() {
     </div>
     <div class="card">
       <div class="card-title">Recent workouts</div>
-      ${recent.length?recent.map(w=>`<div class="list-item"><div><div style="font-weight:600;">${w.session.dayName}</div><div style="font-size:11px;color:#888;">${fmtDate(w.created_at)} · ${w.session.type==='cardio'?'cardio':(w.session.roundsLabel||w.session.totalRounds+' rounds')}</div></div></div>`).join(''):'<div style="font-size:13px;color:#888;">None yet — finish a workout to see it here</div>'}
+      ${recent.length?recent.map(w=>{
+        const h=w.session;
+        const stats=h.type==='cardio'
+          ? `${(h.cardioLog||[]).length} exercises${h.totalElapsedFormatted?' · ⏱ '+h.totalElapsedFormatted:''}`
+          : `${h.roundsLabel||h.totalRounds+' rounds'} · ${(h.exercises||[]).length} exercises${h.totalElapsedFormatted?' · ⏱ '+h.totalElapsedFormatted:''}`;
+        const badge=h.type==='cardio'
+          ? '<span class="badge badge-blue">Cardio</span>'
+          : '<span class="badge badge-purple">Weights</span>';
+        return`<div class="list-item">
+          <div>
+            <div style="font-weight:600;">${h.dayName} &nbsp;<span style="font-weight:400;color:#888;font-size:12px;">${fmtDate(w.created_at)}</span></div>
+            <div style="font-size:12px;color:#888;margin-top:2px;">${badge} ${stats}</div>
+          </div>
+        </div>`;}).join(''):'<div style="font-size:13px;color:#888;">None yet — finish a workout to see it here</div>'}
     </div>`;
 
   if(weights.length>=2) setTimeout(()=>renderWeightChart('dash-chart',true),50);
@@ -363,7 +376,7 @@ function renderMacroHistChart() {
       {label:'Protein ×10',data:proData,backgroundColor:proData.map(v=>v===0?'rgba(29,158,117,0.15)':v>=GOALS.protein*10*0.9?'rgba(29,158,117,0.85)':'rgba(29,158,117,0.45)'),borderRadius:4,borderSkipped:false}
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.datasetIndex===0?` ${ctx.raw===0?'Not logged':ctx.raw.toLocaleString()+' cal'}`:` ${ctx.raw===0?'Not logged':Math.round(ctx.raw/10)+'g protein'}`}}},
-    scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45,autoSkip:false}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(1)+'k':v},suggestedMax:3000,min:0}}}
+    scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45,autoSkip:false}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10},callback:v=>v.toLocaleString()},suggestedMax:3000,min:0}}}
   });
 }
 
@@ -391,13 +404,34 @@ function renderWorkoutPicker() {
 function startSession(dayIdx) {
   const day=plan.days[dayIdx]; const type=dayType(day);
   if(type==='cardio'){
-    session={dayIdx,dayName:DAYS[dayIdx],date:new Date().toISOString(),type:'cardio',cardioLog:[]};
-    switchTabByName('workout'); renderCardioSession(); return;
+    session={dayIdx,dayName:DAYS[dayIdx],date:new Date().toISOString(),type:'cardio',cardioLog:[],sessionStart:Date.now()};
+    switchTabByName('workout'); renderCardioSession(); startTimers(); return;
   }
   const rounds=day.rounds||3; const logged={};
   for(let r=1;r<=rounds;r++) logged[r]=day.exercises.map(()=>null);
-  session={dayIdx,dayName:DAYS[dayIdx],date:new Date().toISOString(),type:'weights',totalRounds:rounds,currentRound:1,exIdx:0,exercises:day.exercises.map(e=>e.name),logged};
-  switchTabByName('workout'); renderLiveSession();
+  session={dayIdx,dayName:DAYS[dayIdx],date:new Date().toISOString(),type:'weights',totalRounds:rounds,currentRound:1,exIdx:0,exercises:day.exercises.map(e=>e.name),logged,sessionStart:Date.now(),roundStart:Date.now(),roundTimes:{}};
+  switchTabByName('workout'); renderLiveSession(); startTimers();
+}
+
+let timerInterval = null;
+
+function startTimers() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if(!session) { clearInterval(timerInterval); return; }
+    const sessionEl = el('timer-session');
+    const roundEl = el('timer-round');
+    if(sessionEl) sessionEl.textContent = formatTimer(Date.now() - session.sessionStart);
+    if(roundEl) roundEl.textContent = formatTimer(Date.now() - session.roundStart);
+  }, 1000);
+}
+
+function formatTimer(ms) {
+  const s = Math.floor(ms/1000);
+  const m = Math.floor(s/60);
+  const h = Math.floor(m/60);
+  if(h>0) return `${h}:${String(m%60).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
 }
 
 // ── LIVE WEIGHTS SESSION ───────────────────────────────────────────────────
@@ -431,7 +465,11 @@ function renderLiveSession() {
           <span style="font-size:15px;font-weight:600;">${dayName}</span>
           <span class="badge badge-purple">Round ${currentRound} of ${totalRounds}</span>
         </div>
-        <div style="display:flex;gap:5px;">${Array.from({length:totalRounds},(_,i)=>{const r=i+1,done=r<currentRound,active=r===currentRound;return`<div class="round-dot${done?' done':active?' active':''}">${done?'✓':r}</div>`;}).join('')}</div>
+        <div style="display:flex;gap:5px;margin-bottom:6px;">${Array.from({length:totalRounds},(_,i)=>{const r=i+1,done=r<currentRound,active=r===currentRound;return`<div class="round-dot${done?' done':active?' active':''}">${done?'✓':r}</div>`;}).join('')}</div>
+        <div style="display:flex;gap:14px;">
+          <div style="font-size:12px;color:#888;">⏱ Total: <span id="timer-session" style="font-weight:600;color:#222;font-variant-numeric:tabular-nums;">00:00</span></div>
+          <div style="font-size:12px;color:#888;">Round: <span id="timer-round" style="font-weight:600;color:#534AB7;font-variant-numeric:tabular-nums;">00:00</span></div>
+        </div>
       </div>
       <button class="btn btn-danger" onclick="endSession()">✕ Finish</button>
     </div>
@@ -456,6 +494,7 @@ function renderLiveSession() {
         <button class="btn btn-sm" onclick="nextExercise()">Next →</button>
       </div>
     </div>`;
+  startTimers();
 }
 
 function goToExercise(i){session.exIdx=i;renderLiveSession();}
@@ -465,20 +504,35 @@ function logSet(){
   logged[currentRound][exIdx]={weight:w,reps:r};
   const next=logged[currentRound].findIndex((s,i)=>i>exIdx&&s===null);
   if(next>=0){session.exIdx=next;}
-  else{const complete=logged[currentRound].every(s=>s!==null);if(complete&&currentRound<totalRounds){session.currentRound++;session.exIdx=0;}else{const any=logged[currentRound].findIndex(s=>s===null);if(any>=0)session.exIdx=any;}}
+  else{
+    const complete=logged[currentRound].every(s=>s!==null);
+    if(complete&&currentRound<totalRounds){
+      // Save round time before advancing
+      if(!session.roundTimes) session.roundTimes={};
+      session.roundTimes[currentRound]=Date.now()-session.roundStart;
+      session.currentRound++;
+      session.roundStart=Date.now();
+      session.exIdx=0;
+    }else{const any=logged[currentRound].findIndex(s=>s===null);if(any>=0)session.exIdx=any;}
+  }
   renderLiveSession();
 }
 function nextExercise(){const{exIdx,exercises,currentRound,totalRounds}=session;if(exIdx<exercises.length-1){session.exIdx++;renderLiveSession();}else if(currentRound<totalRounds){session.currentRound++;session.exIdx=0;renderLiveSession();}}
 function prevExercise(){const{exIdx,currentRound,exercises}=session;if(exIdx>0){session.exIdx--;renderLiveSession();}else if(currentRound>1){session.currentRound--;session.exIdx=exercises.length-1;renderLiveSession();}}
 
 async function endSession(){
+  clearInterval(timerInterval);
   const{currentRound,totalRounds,logged}=session;
   let roundsCompleted=0;
   for(let r=1;r<=totalRounds;r++){if(logged[r]&&logged[r].every(s=>s!==null))roundsCompleted=r;else break;}
   const anyInCurrent=logged[currentRound]&&logged[currentRound].some(s=>s!==null);
   const partialLabel=roundsCompleted===0&&anyInCurrent?`${currentRound} (partial)`:roundsCompleted||`${currentRound} (partial)`;
   const roundsLabel=roundsCompleted===totalRounds?`${totalRounds} rounds`:`${partialLabel} of ${totalRounds} rounds`;
-  const completed={...session,totalRounds:roundsCompleted||currentRound,plannedRounds:totalRounds,roundsLabel,endDate:new Date().toISOString()};
+  // Save final round time
+  if(!session.roundTimes) session.roundTimes={};
+  session.roundTimes[currentRound]=Date.now()-session.roundStart;
+  const totalElapsed=Date.now()-session.sessionStart;
+  const completed={...session,totalRounds:roundsCompleted||currentRound,plannedRounds:totalRounds,roundsLabel,totalElapsedMs:totalElapsed,totalElapsedFormatted:formatTimer(totalElapsed),endDate:new Date().toISOString()};
   showSpinner(true);
   try{
     const rows=await sbPost('workout_history',{session:completed});
@@ -524,7 +578,9 @@ function logCardioEntry(ei,id,subtype){
 function clearCardioEntry(id){session.cardioLog=(session.cardioLog||[]).filter(l=>l.id!==id);renderCardioSession();}
 
 async function endCardioSession(){
-  const completed={...session,endDate:new Date().toISOString()};
+  clearInterval(timerInterval);
+  const totalElapsed=Date.now()-(session.sessionStart||Date.now());
+  const completed={...session,totalElapsedMs:totalElapsed,totalElapsedFormatted:formatTimer(totalElapsed),endDate:new Date().toISOString()};
   showSpinner(true);
   try{
     const rows=await sbPost('workout_history',{session:completed});
@@ -797,6 +853,8 @@ async function deleteWeight(id){
 }
 
 // ── HISTORY ────────────────────────────────────────────────────────────────
+let editingSet = null; // { rowId, exIdx, roundIdx }
+
 function renderHistory(){
   if(!workoutHistory.length){el('section-history').innerHTML='<div class="card"><div style="font-size:13px;color:#888;">No completed workouts yet.</div></div>';return;}
   el('section-history').innerHTML=[...workoutHistory].reverse().map((row,ri)=>{
@@ -805,7 +863,7 @@ function renderHistory(){
     if(h.type==='cardio'){
       return`<div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
-          <div><div style="font-size:14px;font-weight:600;">${h.dayName} <span class="badge badge-blue">Cardio</span></div><div style="font-size:11px;color:#888;">${date}</div></div>
+          <div><div style="font-size:14px;font-weight:600;">${h.dayName} <span class="badge badge-blue">Cardio</span></div><div style="font-size:11px;color:#888;">${date}${h.totalElapsedFormatted?' · ⏱ '+h.totalElapsedFormatted:''}</div></div>
           <button class="btn btn-danger" onclick="deleteHistory('${row.id}')">✕</button>
         </div>
         ${(h.cardioLog||[]).map(entry=>`<div style="margin-bottom:8px;padding:8px;background:#f7f7f5;border-radius:8px;">
@@ -815,14 +873,60 @@ function renderHistory(){
       </div>`;
     }
     const exNames=h.exercises||[];
+    const plannedRounds=h.plannedRounds||h.totalRounds;
     return`<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
-        <div><div style="font-size:14px;font-weight:600;">${h.dayName} <span class="badge badge-purple">Weights</span></div><div style="font-size:11px;color:#888;">${date} · ${h.roundsLabel||h.totalRounds+' rounds'} · ${exNames.length} exercises</div></div>
+        <div><div style="font-size:14px;font-weight:600;">${h.dayName} <span class="badge badge-purple">Weights</span></div><div style="font-size:11px;color:#888;">${date} · ${h.roundsLabel||h.totalRounds+' rounds'} · ${exNames.length} exercises${h.totalElapsedFormatted?' · ⏱ '+h.totalElapsedFormatted:''}</div></div>
         <button class="btn btn-danger" onclick="deleteHistory('${row.id}')">✕</button>
       </div>
-      ${exNames.map((name,ei)=>`<div style="margin-bottom:8px;"><div style="font-size:13px;font-weight:600;margin-bottom:3px;">${name}</div><div style="display:flex;flex-wrap:wrap;gap:5px;">${Array.from({length:h.plannedRounds||h.totalRounds},(_,ri)=>{const s=h.logged&&h.logged[ri+1]&&h.logged[ri+1][ei];return`<span style="font-size:12px;background:#f7f7f5;padding:2px 8px;border-radius:6px;color:${s?'#555':'#bbb'};">R${ri+1}: ${s?`${s.weight?s.weight+' lbs × ':''}${s.reps} reps`:'—'}</span>`;}).join('')}</div></div>`).join('')}
+      ${exNames.map((name,ei)=>`
+        <div style="margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px;">${name}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;">
+            ${Array.from({length:plannedRounds},(_,ri)=>{
+              const s=h.logged&&h.logged[ri+1]&&h.logged[ri+1][ei];
+              const isEditing=editingSet&&editingSet.rowId===row.id&&editingSet.exIdx===ei&&editingSet.roundIdx===ri;
+              if(isEditing){
+                return`<div style="display:flex;align-items:center;gap:5px;background:#EEEDFE;padding:4px 8px;border-radius:8px;">
+                  <span style="font-size:11px;color:#534AB7;font-weight:500;">R${ri+1}:</span>
+                  <input type="number" id="edit-weight-${ei}-${ri}" value="${s?s.weight||'':''}" placeholder="lbs" style="width:70px;font-size:12px;padding:3px 6px;">
+                  <span style="font-size:11px;color:#888;">×</span>
+                  <input type="number" id="edit-reps-${ei}-${ri}" value="${s?s.reps||'':''}" placeholder="reps" style="width:55px;font-size:12px;padding:3px 6px;">
+                  <button class="btn btn-sm" style="background:#534AB7;color:#fff;border-color:#534AB7;font-size:11px;padding:3px 8px;" onclick="saveSetEdit('${row.id}',${ei},${ri})">✓</button>
+                  <button class="btn btn-sm" style="font-size:11px;padding:3px 8px;" onclick="cancelSetEdit()">✕</button>
+                </div>`;
+              }
+              return`<span style="font-size:12px;background:#f7f7f5;padding:2px 8px;border-radius:6px;color:${s?'#555':'#bbb'};cursor:${s?'pointer':'default'};" ${s?`onclick="startSetEdit('${row.id}',${ei},${ri})" title="Click to edit"`:''}>R${ri+1}: ${s?`${s.weight?s.weight+' lbs × ':''}${s.reps} reps`:'—'}${s?' ✎':''}</span>`;
+            }).join('')}
+          </div>
+        </div>`).join('')}
     </div>`;
   }).join('');
+}
+
+function startSetEdit(rowId,exIdx,roundIdx){
+  editingSet={rowId,exIdx,roundIdx};
+  renderHistory();
+}
+function cancelSetEdit(){ editingSet=null; renderHistory(); }
+
+async function saveSetEdit(rowId,exIdx,roundIdx){
+  const row=workoutHistory.find(w=>w.id===rowId);if(!row)return;
+  const weight=parseFloat(el(`edit-weight-${exIdx}-${roundIdx}`).value)||0;
+  const reps=parseInt(el(`edit-reps-${exIdx}-${roundIdx}`).value)||0;
+  if(!reps){cancelSetEdit();return;}
+  const session={...row.session};
+  if(!session.logged[roundIdx+1]) session.logged[roundIdx+1]=session.exercises.map(()=>null);
+  session.logged[roundIdx+1][exIdx]={weight,reps};
+  showSpinner(true);
+  try{
+    await sbPatch('workout_history',{session},`?id=eq.${rowId}`);
+    const idx=workoutHistory.findIndex(w=>w.id===rowId);
+    if(idx>=0) workoutHistory[idx]={...workoutHistory[idx],session};
+    showSave();
+  }catch(e){showErr();}
+  showSpinner(false);
+  editingSet=null;renderHistory();
 }
 
 async function deleteHistory(id){
@@ -844,62 +948,4 @@ function renderEditor(){
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="font-size:13px;width:90px;">${DAYS[i]}</span>
             <div style="display:flex;gap:4px;">
-              <button class="btn btn-sm${type==='rest'?' btn-primary':''}" onclick="setDayType(${i},'rest')">Rest</button>
-              <button class="btn btn-sm${type==='weights'?' btn-primary':''}" onclick="setDayType(${i},'weights')">Weights</button>
-              <button class="btn btn-sm${type==='cardio'?' btn-primary':''}" onclick="setDayType(${i},'cardio')">Cardio</button>
-            </div>
-            ${type==='weights'?`<select onchange="updateRounds(${i},this.value)" style="width:90px;padding:4px 6px;font-size:12px;">${[1,2,3,4,5].map(n=>`<option value="${n}"${(day.rounds||3)===n?' selected':''}>${n} round${n>1?'s':''}</option>`).join('')}</select>`:''}
-          </div>
-          ${type!=='rest'?`<button class="btn btn-sm" onclick="openExEditor(${i})">${editingDay===i?'▲ Editing':'✎ Edit'} (${type==='weights'?(day.exercises||[]).length:(day.cardioExercises||[]).length})</button>`:''}
-        </div>`;}).join('')}
-    </div>
-    ${editingDay!==null?renderExEditorHTML():''}`;
-}
-
-function renderExEditorHTML(){
-  const day=plan.days[editingDay];const type=dayType(day);
-  if(type==='weights'){
-    const exs=day.exercises||[];
-    return`<div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
-        <div class="card-title" style="margin-bottom:0;">${DAYS[editingDay]} — exercises</div>
-        <button class="btn btn-sm" onclick="openExEditor(${editingDay})">✕</button>
-      </div>
-      <div style="font-size:12px;color:#888;margin-bottom:0.6rem;">Exercises run in this order each round.</div>
-      ${!exs.length?'<div style="font-size:13px;color:#aaa;margin-bottom:8px;">No exercises yet.</div>':exs.map((ex,ei)=>`<div class="list-item"><span style="font-size:11px;color:#bbb;width:18px;">${ei+1}</span><span style="flex:1;font-weight:600;">${ex.name}</span><button class="btn btn-sm" onclick="moveEx(${ei},-1)" style="visibility:${ei===0?'hidden':'visible'};">↑</button><button class="btn btn-sm" onclick="moveEx(${ei},1)" style="visibility:${ei===exs.length-1?'hidden':'visible'};">↓</button><button class="btn btn-danger" onclick="removeEx(${ei})">✕</button></div>`).join('')}
-      <div class="row" style="margin-top:0.75rem;"><input type="text" id="new-ex" placeholder="Exercise name" style="flex:2;" onkeydown="if(event.key==='Enter')addEx()"><button class="btn btn-primary" onclick="addEx()">Add</button></div>
-    </div>`;
-  } else {
-    const exs=day.cardioExercises||[];
-    return`<div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
-        <div class="card-title" style="margin-bottom:0;">${DAYS[editingDay]} — cardio exercises</div>
-        <button class="btn btn-sm" onclick="openExEditor(${editingDay})">✕</button>
-      </div>
-      ${!exs.length?'<div style="font-size:13px;color:#aaa;margin-bottom:8px;">No exercises yet.</div>':exs.map((ex,ei)=>`<div class="list-item"><span style="font-size:11px;color:#bbb;width:18px;">${ei+1}</span><span style="flex:1;font-weight:600;">${ex.name}</span><span class="badge badge-${ex.subtype==='walk'?'green':'amber'}">${ex.subtype}</span><button class="btn btn-danger" onclick="removeCardioEx(${ei})">✕</button></div>`).join('')}
-      <div class="row" style="margin-top:0.75rem;"><input type="text" id="new-cardio-ex" placeholder="Exercise name" style="flex:2;"><select id="new-cardio-type" style="width:90px;padding:6px 8px;font-size:12px;"><option value="walk">Walk</option><option value="sprint">Sprint</option></select><button class="btn btn-primary" onclick="addCardioEx()">Add</button></div>
-    </div>`;
-  }
-}
-
-function setDayType(i,type){
-  plan.days[i].rest=(type==='rest');plan.days[i].cardio=(type==='cardio');
-  if(!plan.days[i].exercises)plan.days[i].exercises=[];
-  if(!plan.days[i].cardioExercises)plan.days[i].cardioExercises=[];
-  if(!plan.days[i].rounds)plan.days[i].rounds=3;
-  if(editingDay===i)editingDay=null;
-  savePlan();renderEditor();
-}
-function updateRounds(i,val){plan.days[i].rounds=parseInt(val)||3;savePlan();}
-function openExEditor(i){editingDay=editingDay===i?null:i;renderEditor();}
-function addEx(){const inp=el('new-ex');const name=inp.value.trim();if(!name)return;plan.days[editingDay].exercises.push({name});inp.value='';savePlan();renderEditor();}
-function removeEx(ei){plan.days[editingDay].exercises.splice(ei,1);savePlan();renderEditor();}
-function moveEx(ei,dir){const exs=plan.days[editingDay].exercises;const j=ei+dir;if(j<0||j>=exs.length)return;[exs[ei],exs[j]]=[exs[j],exs[ei]];savePlan();renderEditor();}
-function addCardioEx(){const name=el('new-cardio-ex').value.trim();if(!name)return;const subtype=el('new-cardio-type').value;if(!plan.days[editingDay].cardioExercises)plan.days[editingDay].cardioExercises=[];plan.days[editingDay].cardioExercises.push({id:Date.now().toString(),name,subtype});el('new-cardio-ex').value='';savePlan();renderEditor();}
-function removeCardioEx(ei){plan.days[editingDay].cardioExercises.splice(ei,1);savePlan();renderEditor();}
-
-// ── INIT ───────────────────────────────────────────────────────────────────
-loadAll();
-</script>
-</body>
-</html>
+              <button class="btn btn-sm${type==='rest'?' btn-primary':''}"
