@@ -178,7 +178,6 @@ Chart.register(ChartDataLabels);
 // ── Config ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://tohkwgepspqgjqcrtcug.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvaGt3Z2Vwc3BxZ2pxY3J0Y3VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NDg4NzQsImV4cCI6MjA5NzEyNDg3NH0.JfEoMpCevqpHuTmmFOrSG6jsiSEgHcPjqHY-md-Bfcg';
-const ANTHROPIC_KEY_LS = 'ft-api-key';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const GOALS = { calories:2400, protein:175, carbs:190, fat:100 };
@@ -1112,25 +1111,28 @@ async function resetBuiltins(){
   showSpinner(false);renderLibraryList();
 }
 
-function getApiKey(){
-  let key=localStorage.getItem(ANTHROPIC_KEY_LS)||'';
-  if(!key){key=prompt('Enter your Anthropic API key to use AI lookup:\n(Saved locally on this device only)');if(key&&key.trim()){localStorage.setItem(ANTHROPIC_KEY_LS,key.trim());key=key.trim();}}
-  return key;
-}
-
 async function aiLookup(){
   const q=el('ai-query').value.trim();if(!q)return;
-  const apiKey=getApiKey();if(!apiKey)return;
   const btn=el('ai-btn');const errEl=el('ai-error');
   btn.textContent='Looking up…';btn.disabled=true;errEl.style.display='none';
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:`Estimate nutrition macros for: "${q}". If this is a specific branded product, look up its actual label data. Reply ONLY with a JSON object, no markdown: {"calories":0,"protein":0,"carbs":0,"fat":0,"name":"friendly meal name"}. Round to nearest whole number.`}]})});
-    const data=await res.json();
-    if(data.error){if(data.error.type==='authentication_error'){localStorage.removeItem(ANTHROPIC_KEY_LS);errEl.textContent="Invalid API key — cleared. Click Look up again to re-enter.";errEl.style.display='block';btn.textContent='✦ Look up';btn.disabled=false;return;}throw new Error(data.error.message);}
-    const parsed=JSON.parse((data.content?.[0]?.text||'').replace(/```json|```/g,'').trim());
-    el('meal-name').value=parsed.name||q;el('meal-cal').value=parsed.calories||'';el('meal-pro').value=parsed.protein||'';el('meal-carb').value=parsed.carbs||'';el('meal-fat').value=parsed.fat||'';el('ai-query').value='';
-  }catch(e){errEl.textContent="Couldn't look that up — "+e.message;errEl.style.display='block';}
-  btn.textContent='✦ Look up';btn.disabled=false;
+    const res=await fetch('/api/lookup',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({query:q})
+    });
+    const parsed=await res.json();
+    if(parsed.error) throw new Error(parsed.error);
+    el('meal-name').value=parsed.name||q;
+    el('meal-cal').value=parsed.calories||'';
+    el('meal-pro').value=parsed.protein||'';
+    el('meal-carb').value=parsed.carbs||'';
+    el('meal-fat').value=parsed.fat||'';
+    el('ai-query').value='';
+  }catch(e){
+    if(errEl){errEl.textContent="Couldn't look that up — "+e.message;errEl.style.display='block';}
+  }
+  btn.textContent='Look up macros';btn.disabled=false;
 }
 
 // ── WEIGHT ─────────────────────────────────────────────────────────────────
