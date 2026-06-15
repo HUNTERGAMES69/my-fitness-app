@@ -5,8 +5,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Andy Martin Health and Fitness</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Andy Martin">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AM Fitness">
+<meta name="theme-color" content="#461D7C">
+<link id="apple-touch-icon" rel="apple-touch-icon" href="">
+<style>
+#splash-screen{position:fixed;inset:0;background:#461D7C;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px;}
+#splash-screen svg{width:90px;height:90px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.15));}
+#splash-title{color:#fff;font-family:system-ui,-apple-system,sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.3px;}
+#splash-sub{color:rgba(255,255,255,0.75);font-family:system-ui,-apple-system,sans-serif;font-size:14px;}
+#splash-screen.hidden{opacity:0;transition:opacity 0.4s ease;pointer-events:none;}
+</style>
+<script>
+function generateIcon(){
+  const c=document.createElement('canvas');c.width=180;c.height=180;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#461D7C';
+  ctx.beginPath();ctx.roundRect(0,0,180,180,36);ctx.fill();
+  ctx.fillStyle='#fff';
+  const s=1.8;const ox=0,oy=10;
+  // head
+  ctx.beginPath();ctx.arc(50*s+ox,12*s+oy,9*s,0,Math.PI*2);ctx.fill();
+  // neck
+  ctx.beginPath();ctx.roundRect(46*s+ox,20*s+oy,8*s,6*s,2*s);ctx.fill();
+  // torso
+  ctx.beginPath();ctx.moveTo(30*s+ox,26*s+oy);ctx.quadraticCurveTo(50*s+ox,22*s+oy,70*s+ox,26*s+oy);ctx.lineTo(66*s+ox,58*s+oy);ctx.quadraticCurveTo(50*s+ox,62*s+oy,34*s+ox,58*s+oy);ctx.closePath();ctx.fill();
+  // left upper arm
+  ctx.beginPath();ctx.moveTo(30*s+ox,28*s+oy);ctx.lineTo(14*s+ox,44*s+oy);ctx.quadraticCurveTo(12*s+ox,47*s+oy,14*s+ox,50*s+oy);ctx.lineTo(20*s+ox,50*s+oy);ctx.lineTo(34*s+ox,36*s+oy);ctx.closePath();ctx.fill();
+  // left forearm
+  ctx.beginPath();ctx.moveTo(14*s+ox,44*s+oy);ctx.lineTo(8*s+ox,32*s+oy);ctx.quadraticCurveTo(7*s+ox,29*s+oy,10*s+ox,28*s+oy);ctx.lineTo(13*s+ox,28*s+oy);ctx.lineTo(20*s+ox,42*s+oy);ctx.closePath();ctx.fill();
+  // right upper arm
+  ctx.beginPath();ctx.moveTo(70*s+ox,28*s+oy);ctx.lineTo(86*s+ox,44*s+oy);ctx.quadraticCurveTo(88*s+ox,47*s+oy,86*s+ox,50*s+oy);ctx.lineTo(80*s+ox,50*s+oy);ctx.lineTo(66*s+ox,36*s+oy);ctx.closePath();ctx.fill();
+  // right forearm
+  ctx.beginPath();ctx.moveTo(86*s+ox,44*s+oy);ctx.lineTo(92*s+ox,32*s+oy);ctx.quadraticCurveTo(93*s+ox,29*s+oy,90*s+ox,28*s+oy);ctx.lineTo(87*s+ox,28*s+oy);ctx.lineTo(80*s+ox,42*s+oy);ctx.closePath();ctx.fill();
+  // barbell bar
+  ctx.beginPath();ctx.roundRect(4*s+ox,26*s+oy,92*s,5*s,2.5*s);ctx.fill();
+  // weight plates
+  ctx.beginPath();ctx.roundRect(0*s+ox,20*s+oy,8*s,17*s,3*s);ctx.fill();
+  ctx.beginPath();ctx.roundRect(7*s+ox,22*s+oy,5*s,13*s,2*s);ctx.fill();
+  ctx.beginPath();ctx.roundRect(88*s+ox,22*s+oy,5*s,13*s,2*s);ctx.fill();
+  ctx.beginPath();ctx.roundRect(92*s+ox,20*s+oy,8*s,17*s,3*s);ctx.fill();
+  // legs
+  ctx.beginPath();ctx.moveTo(34*s+ox,58*s+oy);ctx.lineTo(28*s+ox,88*s+oy);ctx.quadraticCurveTo(27*s+ox,92*s+oy,31*s+ox,93*s+oy);ctx.lineTo(37*s+ox,93*s+oy);ctx.lineTo(42*s+ox,62*s+oy);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(66*s+ox,58*s+oy);ctx.lineTo(72*s+ox,88*s+oy);ctx.quadraticCurveTo(73*s+ox,92*s+oy,69*s+ox,93*s+oy);ctx.lineTo(63*s+ox,93*s+oy);ctx.lineTo(58*s+ox,62*s+oy);ctx.closePath();ctx.fill();
+  // feet
+  ctx.beginPath();ctx.ellipse(32*s+ox,95*s+oy,8*s,4*s,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(68*s+ox,95*s+oy,8*s,4*s,0,0,Math.PI*2);ctx.fill();
+  document.getElementById('apple-touch-icon').href=c.toDataURL('image/png');
+}
+document.addEventListener('DOMContentLoaded', generateIcon);
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:system-ui,-apple-system,sans-serif;color:#222;background:#f7f7f5;min-height:100vh;}
@@ -72,7 +120,30 @@ canvas{display:block;}
 </style>
 </head>
 <body>
-<div id="loading-overlay" class="loading-overlay">
+<div id="splash-screen">
+  <svg viewBox="0 0 100 120" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="50" cy="12" r="9"/>
+    <rect x="46" y="20" width="8" height="6" rx="2"/>
+    <path d="M30 26 Q50 22 70 26 L66 58 Q50 62 34 58 Z"/>
+    <path d="M30 28 L14 44 Q12 47 14 50 L20 50 L34 36 Z"/>
+    <path d="M14 44 L8 32 Q7 29 10 28 L13 28 L20 42 Z"/>
+    <path d="M70 28 L86 44 Q88 47 86 50 L80 50 L66 36 Z"/>
+    <path d="M86 44 L92 32 Q93 29 90 28 L87 28 L80 42 Z"/>
+    <rect x="4" y="26" width="92" height="5" rx="2.5"/>
+    <rect x="0" y="20" width="8" height="17" rx="3"/>
+    <rect x="7" y="22" width="5" height="13" rx="2"/>
+    <rect x="88" y="22" width="5" height="13" rx="2"/>
+    <rect x="92" y="20" width="8" height="17" rx="3"/>
+    <path d="M34 58 L28 88 Q27 92 31 93 L37 93 L42 62 Z"/>
+    <path d="M66 58 L72 88 Q73 92 69 93 L63 93 L58 62 Z"/>
+    <ellipse cx="32" cy="95" rx="8" ry="4"/>
+    <ellipse cx="68" cy="95" rx="8" ry="4"/>
+  </svg>
+  <div id="splash-title">Andy Martin</div>
+  <div id="splash-sub">Health & Fitness</div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay" style="display:none;">
   <div class="spinner" style="width:28px;height:28px;border-width:3px;"></div>
   <div style="font-size:14px;color:#888;">Loading your data…</div>
 </div>
@@ -211,6 +282,9 @@ async function loadAll() {
   }
   el('loading-overlay').style.display='none';
   el('app').style.display='block';
+  // Fade out splash screen
+  const splash=el('splash-screen');
+  if(splash){ splash.classList.add('hidden'); setTimeout(()=>splash.style.display='none',400); }
   buildNav();
   renderDashboard();
 }
