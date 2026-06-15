@@ -116,11 +116,11 @@ const DEFAULT_LIBRARY = [
 ];
 const TABS = [
   {id:'dashboard',label:'Dashboard',icon:'⊞'},
-  {id:'workout',label:'Workout',icon:'▶'},
-  {id:'plan',label:'My Plan',icon:'📅'},
   {id:'diet',label:'Diet',icon:'🥗'},
   {id:'weight',label:'Weight',icon:'⚖'},
-  {id:'history',label:'History',icon:'📋'},
+  {id:'workout',label:'Workout',icon:'▶'},
+  {id:'plan',label:'Fitness Plan',icon:'📅'},
+  {id:'history',label:'Workout History',icon:'📋'},
 ];
 
 // ── Supabase API ───────────────────────────────────────────────────────────
@@ -278,9 +278,9 @@ function renderDashboard() {
       <div class="metric"><div class="metric-label">🎯 Streak</div><div class="metric-value">${weekW.length}</div><div class="metric-sub">days active</div></div>
     </div>
     <div class="row" style="gap:8px;margin-bottom:1rem;">
-      <button class="btn" onclick="switchTab('workout')">▶ Start workout</button>
       <button class="btn" onclick="switchTab('diet')">Log meal</button>
       <button class="btn" onclick="switchTab('weight')">Log weight</button>
+      <button class="btn" onclick="switchTab('workout')">▶ Start workout</button>
     </div>
     <div class="card">
       <div class="card-title">Today's nutrition</div>
