@@ -893,10 +893,15 @@ function renderDiet(){
   const defaultTime = nextMealTime();
   const editing = editingMealId ? tm.find(m=>m.id===editingMealId) : null;
 
+  // Check for pending meal from coach
+  const pending = window._pendingCoachMeal || null;
+  if(pending) window._pendingCoachMeal = null;
+
   el('section-diet').innerHTML=`
     <div class="card">
       <div class="card-title">${editing ? 'Edit meal' : 'Log a meal'}</div>
       ${editing ? `<div style="font-size:12px;color:#888;margin-bottom:8px;">Editing: <strong>${editing.data.name}</strong></div>` : ''}
+      ${pending ? `<div style="font-size:12px;background:#E1F5EE;color:#085041;padding:8px 10px;border-radius:8px;margin-bottom:10px;">💬 Pre-filled from coach — review and tap Log meal to confirm</div>` : ''}
 
       ${!editing ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
@@ -931,7 +936,7 @@ function renderDiet(){
 
       <div style="border-top:${editing?'none':'1px solid #f0f0f0'};padding-top:${editing?'0':'12px'};">
         <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-          <div style="flex:2;min-width:140px;"><input type="text" id="meal-name" placeholder="Food or meal name" value="${editing?editing.data.name:''}" style="font-size:14px;"></div>
+          <div style="flex:2;min-width:140px;"><input type="text" id="meal-name" placeholder="Food or meal name" value="${editing?editing.data.name:pending?pending.name:''}" style="font-size:14px;"></div>
           <div style="flex:1;min-width:100px;">
             <select id="meal-time" style="font-size:14px;">
               ${['Breakfast','Lunch','Dinner','Snack'].map(t=>`<option${(editing?editing.data.time:defaultTime)===t?' selected':''}>${t}</option>`).join('')}
@@ -941,19 +946,19 @@ function renderDiet(){
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
           <div>
             <div style="font-size:11px;font-weight:600;color:#378ADD;margin-bottom:3px;text-align:center;">Calories</div>
-            <input type="number" id="meal-cal" placeholder="0" style="font-size:14px;text-align:center;border:1px solid #378ADD;border-left:4px solid #378ADD;" value="${editing?editing.data.calories:''}">
+            <input type="number" id="meal-cal" placeholder="0" style="font-size:14px;text-align:center;border:1px solid #378ADD;border-left:4px solid #378ADD;" value="${editing?editing.data.calories:pending?pending.calories:''}">
           </div>
           <div>
             <div style="font-size:11px;font-weight:600;color:#1D9E75;margin-bottom:3px;text-align:center;">Protein g</div>
-            <input type="number" id="meal-pro" placeholder="0" style="font-size:14px;text-align:center;border:1px solid #1D9E75;border-left:4px solid #1D9E75;" value="${editing?editing.data.protein:''}">
+            <input type="number" id="meal-pro" placeholder="0" style="font-size:14px;text-align:center;border:1px solid #1D9E75;border-left:4px solid #1D9E75;" value="${editing?editing.data.protein:pending?pending.protein:''}">
           </div>
           <div>
             <div style="font-size:11px;font-weight:600;color:#BA7517;margin-bottom:3px;text-align:center;">Carbs g</div>
-            <input type="number" id="meal-carb" placeholder="0" style="font-size:14px;text-align:center;border:1px solid #EF9F27;border-left:4px solid #EF9F27;" value="${editing?editing.data.carbs:''}">
+            <input type="number" id="meal-carb" placeholder="0" style="font-size:14px;text-align:center;border:1px solid #EF9F27;border-left:4px solid #EF9F27;" value="${editing?editing.data.carbs:pending?pending.carbs:''}">
           </div>
           <div>
             <div style="font-size:11px;font-weight:600;color:#D85A30;margin-bottom:3px;text-align:center;">Fat g</div>
-            <input type="number" id="meal-fat" placeholder="0" style="font-size:14px;text-align:center;border:1px solid #D85A30;border-left:4px solid #D85A30;" value="${editing?editing.data.fat:''}">
+            <input type="number" id="meal-fat" placeholder="0" style="font-size:14px;text-align:center;border:1px solid #D85A30;border-left:4px solid #D85A30;" value="${editing?editing.data.fat:pending?pending.fat:''}">
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1567,11 +1572,40 @@ function renderCoach() {
 }
 
 function renderCoachMessages() {
-  return coachMessages.map(m=>`
-    <div style="display:flex;justify-content:${m.role==='user'?'flex-end':'flex-start'};margin-bottom:10px;">
-      <div style="max-width:85%;padding:10px 14px;border-radius:${m.role==='user'?'16px 16px 4px 16px':'16px 16px 16px 4px'};background:${m.role==='user'?'#461D7C':'#fff'};border:${m.role==='user'?'none':'1px solid #e5e5e5'};color:${m.role==='user'?'#fff':'#222'};font-size:14px;line-height:1.5;white-space:pre-wrap;">${m.content}</div>
-    </div>`).join('');
+  return coachMessages.map((m,i)=>{
+    // Parse mealData from extra field or direct property
+    let mealData = m.mealData || null;
+    if(!mealData && m.extra) {
+      try { mealData = JSON.parse(m.extra); } catch(e){}
+    }
+    const showLogBtn = m.role==='assistant' && mealData;
+    return`<div style="display:flex;justify-content:${m.role==='user'?'flex-end':'flex-start'};margin-bottom:10px;">
+      <div style="max-width:85%;">
+        <div style="padding:10px 14px;border-radius:${m.role==='user'?'16px 16px 4px 16px':'16px 16px 16px 4px'};background:${m.role==='user'?'#461D7C':'#fff'};border:${m.role==='user'?'none':'1px solid #e5e5e5'};color:${m.role==='user'?'#fff':'#222'};font-size:14px;line-height:1.5;white-space:pre-wrap;">${m.content}</div>
+        ${showLogBtn?`<div style="margin-top:6px;">
+          <button onclick="logMealFromCoach(${i})" style="padding:8px 14px;border-radius:20px;background:#1D9E75;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
+            + Log this meal
+          </button>
+          <span style="font-size:11px;color:#aaa;margin-left:8px;">${mealData.calories} cal · P:${mealData.protein}g C:${mealData.carbs}g F:${mealData.fat}g</span>
+        </div>`:''}
+      </div>
+    </div>`;
+  }).join('');
 }
+
+function logMealFromCoach(msgIdx) {
+  const m = coachMessages[msgIdx];
+  let mealData = m.mealData || null;
+  if(!mealData && m.extra) {
+    try { mealData = JSON.parse(m.extra); } catch(e){}
+  }
+  if(!mealData) return;
+
+  // Store pending meal for the diet tab to pick up
+  window._pendingCoachMeal = mealData;
+  switchTab('diet');
+}
+
 
 function scrollCoachToBottom() {
   setTimeout(()=>{
@@ -1591,8 +1625,6 @@ async function sendCoachMessage() {
   const text=inp?inp.value.trim():'';
   if(!text)return;
   inp.value='';
-
-  const userMsg={role:'user',content:text};
 
   // Save to Supabase and local state
   showSpinner(true);
@@ -1615,23 +1647,21 @@ async function sendCoachMessage() {
   }
 
   try {
-    // Build messages array for API (only role+content)
     const apiMessages = coachMessages.map(m=>({role:m.role,content:m.content}));
-
     const res=await fetch('/api/coach',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        messages: apiMessages,
-        context: buildContext()
-      })
+      body:JSON.stringify({ messages: apiMessages, context: buildContext() })
     });
     const data=await res.json();
     if(data.error) throw new Error(data.error);
 
-    // Save assistant reply
-    const rows=await sbPost('coach_messages',{role:'assistant',content:data.reply});
-    if(rows&&rows[0]) coachMessages.push(rows[0]);
+    // Store meal data on the message if present
+    const content = data.reply;
+    const extra = data.mealData ? JSON.stringify(data.mealData) : null;
+
+    const rows=await sbPost('coach_messages',{role:'assistant',content,extra});
+    if(rows&&rows[0]) coachMessages.push({...rows[0], mealData: data.mealData||null});
     showSave();
   } catch(e) {
     const rows=await sbPost('coach_messages',{role:'assistant',content:'Sorry, I had trouble responding. Please try again.'});
