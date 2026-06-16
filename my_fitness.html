@@ -873,10 +873,10 @@ function renderDiet(){
           <div style="font-size:13px;font-weight:600;color:#222;">My Meals</div>
           <div style="font-size:11px;color:#888;">${foodLibrary.length} saved</div>
         </button>
-        <button onclick="focusAiLookup()" style="padding:12px 8px;border-radius:10px;border:1px solid #461D7C;background:#EEEDFE;cursor:pointer;font-family:inherit;text-align:center;">
+        <button onclick="focusAiLookup()" id="ai-tile-btn" style="padding:12px 8px;border-radius:10px;border:1px solid #e5e5e5;background:#f7f7f5;cursor:pointer;font-family:inherit;text-align:center;">
           <div style="font-size:18px;margin-bottom:4px;">✦</div>
-          <div style="font-size:13px;font-weight:600;color:#461D7C;">AI Lookup</div>
-          <div style="font-size:11px;color:#7F77DD;">Describe any meal</div>
+          <div style="font-size:13px;font-weight:600;color:#222;">AI Lookup</div>
+          <div style="font-size:11px;color:#888;">Describe any meal</div>
         </button>
       </div>
 
@@ -1030,12 +1030,37 @@ async function saveEditMeal(id){
   editingMealId=null;renderDiet();
 }
 
+function setTileActive(active) {
+  const libBtn=el('lib-btn'); const aiBtn=el('ai-tile-btn');
+  if(!libBtn||!aiBtn) return;
+  const neutral={border:'1px solid #e5e5e5',background:'#f7f7f5'};
+  const activeLib={border:'1px solid #222',background:'#222'};
+  const activeAi={border:'1px solid #461D7C',background:'#EEEDFE'};
+  if(active==='lib'){
+    Object.assign(libBtn.style,activeLib);
+    libBtn.querySelectorAll('div').forEach((d,i)=>{d.style.color=i===0?'#fff':i===1?'#fff':'rgba(255,255,255,0.7)';});
+    Object.assign(aiBtn.style,neutral);
+    aiBtn.querySelectorAll('div').forEach((d,i)=>{d.style.color=i===1?'#222':'#888';});
+  } else if(active==='ai'){
+    Object.assign(aiBtn.style,activeAi);
+    aiBtn.querySelectorAll('div').forEach((d,i)=>{d.style.color=i===1?'#461D7C':'#7F77DD';});
+    Object.assign(libBtn.style,neutral);
+    libBtn.querySelectorAll('div').forEach((d,i)=>{d.style.color=i===1?'#222':'#888';});
+  } else {
+    Object.assign(libBtn.style,neutral);
+    libBtn.querySelectorAll('div').forEach((d,i)=>{d.style.color=i===1?'#222':'#888';});
+    Object.assign(aiBtn.style,neutral);
+    aiBtn.querySelectorAll('div').forEach((d,i)=>{d.style.color=i===1?'#222':'#888';});
+  }
+}
+
 function toggleLibrary(){
   const p=el('library-panel'); if(!p)return;
   const aiP=el('ai-panel');
   const isOpen=p.style.display!=='none';
   p.style.display=isOpen?'none':'block';
   if(!isOpen&&aiP) aiP.style.display='none';
+  setTileActive(isOpen?null:'lib');
 }
 
 function focusAiLookup(){
@@ -1044,6 +1069,7 @@ function focusAiLookup(){
   const isOpen=aiP.style.display!=='none';
   aiP.style.display=isOpen?'none':'block';
   if(!isOpen&&libP) libP.style.display='none';
+  setTileActive(isOpen?null:'ai');
   if(!isOpen) setTimeout(()=>{const q=el('ai-query');if(q)q.focus();},50);
 }
 
@@ -1095,6 +1121,7 @@ async function saveToLibrary(){
 }
 
 async function deleteFromLibrary(id){
+  if(!confirm('Delete this meal from My Meals?')) return;
   showSpinner(true);
   try{await sbDelete('food_library',`?id=eq.${id}`);foodLibrary=foodLibrary.filter(i=>i.id!==id);showSave();}catch(e){showErr();}
   showSpinner(false);renderLibraryList();
