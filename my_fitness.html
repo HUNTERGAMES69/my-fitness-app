@@ -1111,21 +1111,33 @@ function focusAiLookup(){
 
 function renderLibraryList(){
   const e=el('library-list');if(!e)return;
+  const defaultTime=nextMealTime();
   e.innerHTML=foodLibrary.length?foodLibrary.map(item=>`
-    <div class="list-item" style="cursor:pointer;" onclick="logFromLibrary('${item.id}')">
-      <div><div style="font-weight:600;">${item.name}</div><div style="font-size:11px;color:#888;">${item.calories} cal · P:${item.protein}g C:${item.carbs}g F:${item.fat}g</div>${item.notes?`<div style="font-size:11px;color:#bbb;">${item.notes}</div>`:''}</div>
-      <button class="btn btn-danger" onclick="event.stopPropagation();deleteFromLibrary('${item.id}')">✕</button>
+    <div class="list-item" style="flex-direction:column;align-items:stretch;gap:6px;padding:8px 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div style="font-weight:600;">${item.name}</div><div style="font-size:11px;color:#888;">${item.calories} cal · P:${item.protein}g C:${item.carbs}g F:${item.fat}g</div>${item.notes?`<div style="font-size:11px;color:#bbb;">${item.notes}</div>`:''}</div>
+        <button class="btn btn-danger" onclick="event.stopPropagation();deleteFromLibrary('${item.id}')">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <select id="lib-time-${item.id}" style="flex:1;font-size:13px;padding:6px 8px;">
+          ${['Breakfast','Lunch','Dinner','Snack'].map(t=>`<option${t===defaultTime?' selected':''}>${t}</option>`).join('')}
+        </select>
+        <button class="btn btn-success" style="font-size:13px;padding:7px 16px;" onclick="logFromLibrary('${item.id}')">+ Log</button>
+      </div>
     </div>`).join(''):'<div style="font-size:13px;color:#aaa;">No saved meals yet.</div>';
 }
 
 async function logFromLibrary(id){
   const item=foodLibrary.find(i=>i.id===id);if(!item)return;
-  const time=el('meal-time')?el('meal-time').value:'Breakfast';
+  const timeEl=el(`lib-time-${id}`);
+  const time=timeEl?timeEl.value:nextMealTime();
   const data={name:item.name,time,calories:item.calories,protein:item.protein,carbs:item.carbs,fat:item.fat,date:new Date().toISOString()};
   showSpinner(true);
   try{const rows=await sbPost('meals',{data});if(rows&&rows[0])meals.unshift(rows[0]);showSave();}catch(e){showErr();}
   showSpinner(false);
-  el('library-panel').style.display='none';renderDiet();
+  el('library-panel').style.display='none';
+  setTileActive(null);
+  renderDiet();
 }
 
 async function addMeal(){
