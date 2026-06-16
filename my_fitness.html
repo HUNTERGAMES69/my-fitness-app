@@ -156,7 +156,7 @@ canvas{display:block;}
         <span id="save-badge" style="display:none;" class="save-badge">✓ Saved</span>
         <span id="err-badge" style="display:none;" class="err-badge">⚠ Save failed</span>
         <div class="spinner" id="sync-spinner" style="display:none;"></div>
-        <button class="btn btn-sm" onclick="exportAll()" style="font-size:11px;">⬇ Data Export</button>
+        <button class="btn btn-sm" onclick="refreshData()" style="font-size:13px;padding:4px 10px;" title="Refresh data">↺</button>
       </div>
     </div>
     <div class="nav" id="nav"></div>
@@ -434,7 +434,8 @@ function renderDashboard() {
             <div style="font-size:12px;color:#888;margin-top:2px;">${badge} ${stats}</div>
           </div>
         </div>`;}).join(''):'<div style="font-size:13px;color:#888;">None yet — finish a workout to see it here</div>'}
-    </div>`;
+    </div>
+    <button class="btn" onclick="exportAll()" style="width:100%;justify-content:center;padding:10px;font-size:13px;">⬇ Data Export</button>`;
 
   if(weights.length>=1) setTimeout(()=>renderWeightChart('dash-chart',true),50);
   setTimeout(()=>renderMacroHistChart(),50);
@@ -1475,6 +1476,40 @@ async function exportAll() {
   const date = new Date().toLocaleDateString('en-US').replace(/\//g,'-');
   XLSX.writeFile(wb, `AndyMartinFitness_${date}.xlsx`);
 }
+
+// ── REFRESH ────────────────────────────────────────────────────────────────
+async function refreshData() {
+  const btn = document.querySelector('button[onclick="refreshData()"]');
+  if(btn){ btn.style.opacity='0.4'; btn.style.pointerEvents='none'; }
+  showSpinner(true);
+  try {
+    const [planRows,histRows,mealRows,weightRows,libRows] = await Promise.all([
+      sbGet('workout_plan','?order=updated_at.desc&limit=1'),
+      sbGet('workout_history','?order=created_at.asc'),
+      sbGet('meals','?order=logged_at.desc'),
+      sbGet('weights','?order=logged_at.desc'),
+      sbGet('food_library','?order=created_at.asc'),
+    ]);
+    if(planRows.length){ plan=planRows[0].data; planRowId=planRows[0].id; plan.days.forEach(d=>{if(!d.rounds)d.rounds=3;if(!d.exercises)d.exercises=[];if(!d.cardioExercises)d.cardioExercises=[];}); }
+    workoutHistory=histRows; meals=mealRows; weights=weightRows;
+    foodLibrary=libRows.length?libRows:DEFAULT_LIBRARY.slice();
+  } catch(e){ showErr(); }
+  showSpinner(false);
+  if(btn){ btn.style.opacity=''; btn.style.pointerEvents=''; }
+  // Re-render current tab
+  switchTab(currentTab);
+}
+
+// Auto-refresh when app comes back to foreground
+let lastHidden = 0;
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') {
+    const now = Date.now();
+    if(now - lastHidden > 30000) refreshData(); // only if away 30+ seconds
+  } else {
+    lastHidden = Date.now();
+  }
+});
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 loadAll();
