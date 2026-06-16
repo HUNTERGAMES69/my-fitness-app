@@ -400,15 +400,33 @@ function renderDashboard() {
       </div>
     </div>
     <div class="card">
-      <div class="card-title">Today's meals</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <div class="card-title" style="margin-bottom:0;">Today's meals</div>
+        <span style="font-size:12px;color:#888;">${t.cal} kcal</span>
+      </div>
       ${tm.length
-        ? tm.map(m=>`
-          <div class="list-item">
-            <div>
-              <div style="font-weight:600;">${m.data.name}</div>
-              <div style="font-size:11px;color:#888;">${m.data.time} · ${m.data.calories} kcal · P:${m.data.protein}g C:${m.data.carbs}g F:${m.data.fat}g</div>
-            </div>
-          </div>`).join('')
+        ? tm.map((m,mi)=>{
+            const mEff=m.data.calories>0?Math.round(m.data.protein/(m.data.calories/10)*100):0;
+            const mColor=mEff>=100?'#1D9E75':mEff>=75?'#EF9F27':'#D85A30';
+            return`<div style="padding:8px 0;border-bottom:${mi<tm.length-1?'0.5px solid #f0f0f0':'none'};">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+                <div>
+                  <div style="font-size:13px;font-weight:600;">${m.data.name}</div>
+                  <div style="font-size:11px;color:#888;">${m.data.time} · ${m.data.calories} kcal · P:${m.data.protein}g C:${m.data.carbs}g F:${m.data.fat}g</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;margin-left:8px;">
+                  <div style="text-align:right;">
+                    <div style="font-size:12px;font-weight:700;color:${mColor};">${mEff}%</div>
+                    <div style="font-size:10px;color:#bbb;">efficiency</div>
+                  </div>
+                  <div style="width:8px;height:8px;border-radius:50%;background:${mColor};flex-shrink:0;"></div>
+                </div>
+              </div>
+              <div style="background:#eee;border-radius:4px;height:4px;overflow:hidden;">
+                <div style="width:${Math.min(100,mEff)}%;height:100%;background:${mColor};border-radius:4px;"></div>
+              </div>
+            </div>`;
+          }).join('')
         : '<div style="font-size:13px;color:#888;">No meals logged today.</div>'}
     </div>
     <div class="card">
