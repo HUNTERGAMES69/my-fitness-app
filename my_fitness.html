@@ -115,6 +115,8 @@ input:focus,select:focus{outline:2px solid #378ADD;border-color:#378ADD;}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid #eee;border-top-color:#378ADD;border-radius:50%;animation:spin 0.7s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .loading-overlay{position:fixed;inset:0;background:rgba(247,247,245,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:12px;}
+#coach-fab{position:fixed;bottom:24px;right:20px;width:54px;height:54px;border-radius:50%;background:#461D7C;color:#fff;border:none;font-size:22px;cursor:pointer;z-index:150;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(70,29,124,0.35);}
+#coach-fab:active{transform:scale(0.94);}
 canvas{display:block;}
 @media(max-width:500px){.two-col{grid-template-columns:1fr;}}
 </style>
@@ -171,6 +173,7 @@ canvas{display:block;}
   <div id="section-editor" class="section"></div>
   <div id="section-coach" class="section"></div>
 </div>
+<button id="coach-fab" onclick="toggleCoach()" title="Ask your coach">💬</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
@@ -194,7 +197,6 @@ const TABS = [
   {id:'weight',label:'Weight',icon:'⚖'},
   {id:'plan',label:'Fitness Plan',icon:'📅'},
   {id:'history',label:'Workout History',icon:'📋'},
-  {id:'coach',label:'Coach',icon:'💬'},
 ];
 
 // ── Supabase API ───────────────────────────────────────────────────────────
@@ -327,6 +329,7 @@ function switchTab(name) {
   currentTab=name;
   el('section-'+name).classList.add('active');
   if(name!=='editor'&&name!=='workout') buildNav();
+  window.scrollTo(0,0);
   if(name==='dashboard') renderDashboard();
   if(name==='workout') renderWorkoutPicker();
   if(name==='plan') renderPlan();
@@ -335,6 +338,17 @@ function switchTab(name) {
   if(name==='history') renderHistory();
   if(name==='editor') renderEditor();
   if(name==='coach') renderCoach();
+  // Show/hide FAB — hide on coach tab since we're already there
+  const fab=el('coach-fab');
+  if(fab) fab.style.display=name==='coach'?'none':'flex';
+}
+
+function toggleCoach() {
+  if(currentTab==='coach') {
+    switchTab('dashboard');
+  } else {
+    switchTab('coach');
+  }
 }
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
@@ -1512,6 +1526,10 @@ ${weights.slice(0,5).map(w=>`- ${fmtDate(w.logged_at)}: ${w.value} ${w.unit}`).j
 
 function renderCoach() {
   el('section-coach').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">
+      <button class="btn btn-sm" onclick="history.back?switchTab('dashboard'):switchTab('dashboard')">← Back</button>
+      <span style="font-size:16px;font-weight:600;">💬 Your Coach</span>
+    </div>
     <div style="display:flex;flex-direction:column;gap:0;">
       <div id="coach-messages" style="min-height:200px;margin-bottom:1rem;">
         ${coachMessages.length ? renderCoachMessages() : `
