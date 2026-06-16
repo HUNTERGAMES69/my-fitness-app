@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="AM Fitness">
 <meta name="theme-color" content="#461D7C">
 <link id="apple-touch-icon" rel="apple-touch-icon" href="">
+<link id="favicon" rel="icon" type="image/png" href="">
 <style>
 #splash-screen{position:fixed;inset:0;background:#461D7C;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px;}
 #splash-screen svg{width:90px;height:90px;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.15));}
@@ -52,6 +53,7 @@ function generateIcon(){
   ctx.beginPath();ctx.ellipse(32*s+ox,95*s+oy,8*s,4*s,0,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.ellipse(68*s+ox,95*s+oy,8*s,4*s,0,0,Math.PI*2);ctx.fill();
   document.getElementById('apple-touch-icon').href=c.toDataURL('image/png');
+  document.getElementById('favicon').href=c.toDataURL('image/png');
 }
 document.addEventListener('DOMContentLoaded', generateIcon);
 </script>
