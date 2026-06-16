@@ -169,6 +169,7 @@ canvas{display:block;}
   <div id="section-weight" class="section"></div>
   <div id="section-history" class="section"></div>
   <div id="section-editor" class="section"></div>
+  <div id="section-coach" class="section"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -193,6 +194,7 @@ const TABS = [
   {id:'weight',label:'Weight',icon:'⚖'},
   {id:'plan',label:'Fitness Plan',icon:'📅'},
   {id:'history',label:'Workout History',icon:'📋'},
+  {id:'coach',label:'Coach',icon:'💬'},
 ];
 
 // ── Supabase API ───────────────────────────────────────────────────────────
@@ -238,6 +240,7 @@ let meals = [];
 let weights = [];
 let foodLibrary = [];
 let planRowId = null;
+let coachMessages = [];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function el(id){ return document.getElementById(id); }
@@ -260,12 +263,13 @@ function showSpinner(v){ el('sync-spinner').style.display=v?'inline-block':'none
 // ── Load all data ──────────────────────────────────────────────────────────
 async function loadAll() {
   try {
-    const [planRows, histRows, mealRows, weightRows, libRows] = await Promise.all([
+    const [planRows, histRows, mealRows, weightRows, libRows, coachRows] = await Promise.all([
       sbGet('workout_plan','?order=updated_at.desc&limit=1'),
       sbGet('workout_history','?order=created_at.asc'),
       sbGet('meals','?order=logged_at.desc'),
       sbGet('weights','?order=logged_at.desc'),
       sbGet('food_library','?order=created_at.asc'),
+      sbGet('coach_messages','?order=created_at.asc'),
     ]);
 
     if(planRows.length) {
@@ -277,6 +281,7 @@ async function loadAll() {
     meals = mealRows;
     weights = weightRows;
     foodLibrary = libRows.length ? libRows : DEFAULT_LIBRARY.slice();
+    coachMessages = coachRows;
     if(!libRows.length) await seedLibrary();
   } catch(e) {
     console.error('Load error', e);
@@ -329,6 +334,7 @@ function switchTab(name) {
   if(name==='weight') renderWeight();
   if(name==='history') renderHistory();
   if(name==='editor') renderEditor();
+  if(name==='coach') renderCoach();
 }
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
@@ -1477,22 +1483,164 @@ async function exportAll() {
   XLSX.writeFile(wb, `AndyMartinFitness_${date}.xlsx`);
 }
 
-// ── REFRESH ────────────────────────────────────────────────────────────────
+// ── COACH ──────────────────────────────────────────────────────────────────
+function buildContext() {
+  const tm = todayMeals();
+  const t = macroTotals(tm);
+  const cur = weights[0];
+  const recentWorkouts = [...workoutHistory].reverse().slice(0,5);
+  const recentMeals = meals.slice(0,10);
+
+  return `
+CURRENT STATS:
+- Weight: ${cur ? cur.value+' '+cur.unit : 'not logged yet'}
+- Today's calories: ${t.cal} / ${GOALS.calories} goal
+- Today's protein: ${t.pro}g / ${GOALS.protein}g goal
+- Today's carbs: ${t.carb}g / ${GOALS.carbs}g goal
+- Today's fat: ${t.fat}g / ${GOALS.fat}g goal
+
+RECENT MEALS (last 10):
+${recentMeals.map(m=>`- ${m.data.name}: ${m.data.calories} cal, ${m.data.protein}g protein, ${m.data.carbs}g carbs, ${m.data.fat}g fat`).join('\n')||'None logged'}
+
+RECENT WORKOUTS (last 5):
+${recentWorkouts.map(w=>`- ${w.session.dayName} (${w.session.type}): ${w.session.roundsLabel||''} ${w.session.totalElapsedFormatted?'⏱ '+w.session.totalElapsedFormatted:''}`).join('\n')||'None logged'}
+
+WEIGHT HISTORY (last 5 entries):
+${weights.slice(0,5).map(w=>`- ${fmtDate(w.logged_at)}: ${w.value} ${w.unit}`).join('\n')||'No entries yet'}
+  `.trim();
+}
+
+function renderCoach() {
+  el('section-coach').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:0;">
+      <div id="coach-messages" style="min-height:200px;margin-bottom:1rem;">
+        ${coachMessages.length ? renderCoachMessages() : `
+          <div class="card" style="text-align:center;padding:2rem 1.25rem;">
+            <div style="font-size:32px;margin-bottom:8px;">💬</div>
+            <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Your personal fitness coach</div>
+            <div style="font-size:13px;color:#888;">Ask me anything — meal advice, exercise tips, weight loss strategy, or anything fitness related. I know your data and can give personalized answers.</div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;">
+            ${['What should I eat for lunch today?','How is my protein tracking this week?','Tips for improving my workout performance','Am I on track with my recomp goals?'].map(q=>`
+              <button onclick="sendSuggestion('${q}')" style="padding:8px 12px;border-radius:20px;border:1px solid #e5e5e5;background:#fff;font-size:12px;cursor:pointer;font-family:inherit;color:#444;">${q}</button>`).join('')}
+          </div>`}
+      </div>
+      <div class="card" style="position:sticky;bottom:0;margin-bottom:0;">
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+          <textarea id="coach-input" placeholder="Ask your coach anything…" rows="2" style="flex:1;border-radius:8px;padding:10px 12px;font-size:14px;border:1px solid #ccc;font-family:inherit;resize:none;line-height:1.4;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoachMessage();}"></textarea>
+          <button onclick="sendCoachMessage()" id="coach-send" style="padding:10px 16px;border-radius:8px;background:#461D7C;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">Send</button>
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:6px;">Shift+Enter for new line · Enter to send</div>
+        ${coachMessages.length?`<button onclick="clearCoachHistory()" style="margin-top:8px;font-size:11px;color:#bbb;background:none;border:none;cursor:pointer;font-family:inherit;">Clear conversation</button>`:''}
+      </div>
+    </div>`;
+  scrollCoachToBottom();
+}
+
+function renderCoachMessages() {
+  return coachMessages.map(m=>`
+    <div style="display:flex;justify-content:${m.role==='user'?'flex-end':'flex-start'};margin-bottom:10px;">
+      <div style="max-width:85%;padding:10px 14px;border-radius:${m.role==='user'?'16px 16px 4px 16px':'16px 16px 16px 4px'};background:${m.role==='user'?'#461D7C':'#fff'};border:${m.role==='user'?'none':'1px solid #e5e5e5'};color:${m.role==='user'?'#fff':'#222'};font-size:14px;line-height:1.5;white-space:pre-wrap;">${m.content}</div>
+    </div>`).join('');
+}
+
+function scrollCoachToBottom() {
+  setTimeout(()=>{
+    const msgs=el('coach-messages');
+    if(msgs) msgs.scrollTop=msgs.scrollHeight;
+    window.scrollTo(0, document.body.scrollHeight);
+  },50);
+}
+
+function sendSuggestion(text) {
+  const inp=el('coach-input');
+  if(inp){ inp.value=text; sendCoachMessage(); }
+}
+
+async function sendCoachMessage() {
+  const inp=el('coach-input');
+  const text=inp?inp.value.trim():'';
+  if(!text)return;
+  inp.value='';
+
+  const userMsg={role:'user',content:text};
+
+  // Save to Supabase and local state
+  showSpinner(true);
+  try{ const rows=await sbPost('coach_messages',{role:'user',content:text}); if(rows&&rows[0])coachMessages.push(rows[0]); }catch(e){}
+
+  // Show user message immediately
+  renderCoach();
+  const sendBtn=el('coach-send');
+  if(sendBtn){sendBtn.textContent='…';sendBtn.disabled=true;}
+
+  // Show typing indicator
+  const msgs=el('coach-messages');
+  if(msgs){
+    const typing=document.createElement('div');
+    typing.id='typing-indicator';
+    typing.style.cssText='display:flex;justify-content:flex-start;margin-bottom:10px;';
+    typing.innerHTML='<div style="padding:10px 14px;border-radius:16px 16px 16px 4px;background:#fff;border:1px solid #e5e5e5;font-size:14px;color:#888;">Thinking…</div>';
+    msgs.appendChild(typing);
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+
+  try {
+    // Build messages array for API (only role+content)
+    const apiMessages = coachMessages.map(m=>({role:m.role,content:m.content}));
+
+    const res=await fetch('/api/coach',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        messages: apiMessages,
+        context: buildContext()
+      })
+    });
+    const data=await res.json();
+    if(data.error) throw new Error(data.error);
+
+    // Save assistant reply
+    const rows=await sbPost('coach_messages',{role:'assistant',content:data.reply});
+    if(rows&&rows[0]) coachMessages.push(rows[0]);
+    showSave();
+  } catch(e) {
+    const rows=await sbPost('coach_messages',{role:'assistant',content:'Sorry, I had trouble responding. Please try again.'});
+    if(rows&&rows[0]) coachMessages.push(rows[0]);
+    showErr();
+  }
+  showSpinner(false);
+  renderCoach();
+}
+
+async function clearCoachHistory() {
+  if(!confirm('Clear the entire conversation history?')) return;
+  showSpinner(true);
+  try {
+    await sbDelete('coach_messages','?id=neq.00000000-0000-0000-0000-000000000000');
+    coachMessages=[];
+    showSave();
+  } catch(e){ showErr(); }
+  showSpinner(false);
+  renderCoach();
+}
 async function refreshData() {
   const btn = document.querySelector('button[onclick="refreshData()"]');
   if(btn){ btn.style.opacity='0.4'; btn.style.pointerEvents='none'; }
   showSpinner(true);
   try {
-    const [planRows,histRows,mealRows,weightRows,libRows] = await Promise.all([
+    const [planRows,histRows,mealRows,weightRows,libRows,coachRows] = await Promise.all([
       sbGet('workout_plan','?order=updated_at.desc&limit=1'),
       sbGet('workout_history','?order=created_at.asc'),
       sbGet('meals','?order=logged_at.desc'),
       sbGet('weights','?order=logged_at.desc'),
       sbGet('food_library','?order=created_at.asc'),
+      sbGet('coach_messages','?order=created_at.asc'),
     ]);
     if(planRows.length){ plan=planRows[0].data; planRowId=planRows[0].id; plan.days.forEach(d=>{if(!d.rounds)d.rounds=3;if(!d.exercises)d.exercises=[];if(!d.cardioExercises)d.cardioExercises=[];}); }
     workoutHistory=histRows; meals=mealRows; weights=weightRows;
     foodLibrary=libRows.length?libRows:DEFAULT_LIBRARY.slice();
+    coachMessages=coachRows;
   } catch(e){ showErr(); }
   showSpinner(false);
   if(btn){ btn.style.opacity=''; btn.style.pointerEvents=''; }
