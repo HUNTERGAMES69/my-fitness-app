@@ -391,9 +391,8 @@ function renderDashboard() {
       </div>
     </div>
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+      <div style="margin-bottom:0.75rem;">
         <div class="card-title" style="margin-bottom:0;">Today's meals</div>
-        <span style="font-size:12px;color:#888;">${t.cal} kcal</span>
       </div>
       ${tm.length
         ? tm.map((m,mi)=>{
@@ -973,7 +972,7 @@ function renderDiet(){
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
         <div class="card-title" style="margin-bottom:0;">Today's food log</div>
-        <span style="font-size:12px;color:#888;">${t.cal} kcal</span>
+        <span style="font-size:12px;color:#888;">${t.cal} cal</span>
       </div>
       <div id="meal-list">${tm.length?tm.map((m)=>`
         <div class="list-item" style="${m.id===editingMealId?'background:#f7f7f5;border-radius:8px;padding:4px 8px;margin:-4px -8px;':''}">
@@ -1114,7 +1113,7 @@ function renderLibraryList(){
   const e=el('library-list');if(!e)return;
   e.innerHTML=foodLibrary.length?foodLibrary.map(item=>`
     <div class="list-item" style="cursor:pointer;" onclick="logFromLibrary('${item.id}')">
-      <div><div style="font-weight:600;">${item.name}</div><div style="font-size:11px;color:#888;">${item.calories} kcal · P:${item.protein}g C:${item.carbs}g F:${item.fat}g</div>${item.notes?`<div style="font-size:11px;color:#bbb;">${item.notes}</div>`:''}</div>
+      <div><div style="font-weight:600;">${item.name}</div><div style="font-size:11px;color:#888;">${item.calories} cal · P:${item.protein}g C:${item.carbs}g F:${item.fat}g</div>${item.notes?`<div style="font-size:11px;color:#bbb;">${item.notes}</div>`:''}</div>
       <button class="btn btn-danger" onclick="event.stopPropagation();deleteFromLibrary('${item.id}')">✕</button>
     </div>`).join(''):'<div style="font-size:13px;color:#aaa;">No saved meals yet.</div>';
 }
