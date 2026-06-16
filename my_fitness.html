@@ -385,18 +385,9 @@ function renderDashboard() {
       ${macroBarHTML('Protein',t.pro,GOALS.protein,'#1D9E75')}
       ${macroBarHTML('Carbs',t.carb,GOALS.carbs,'#EF9F27')}
       ${macroBarHTML('Fat',t.fat,GOALS.fat,'#D85A30')}
-      <div style="border-top:0.5px solid #f0f0f0;margin-top:10px;padding-top:10px;display:flex;align-items:center;justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:7px;">
-          <div style="width:8px;height:8px;border-radius:50%;background:${effColor};flex-shrink:0;"></div>
-          <span style="font-size:12px;color:#555;">Protein efficiency</span>
-          <span style="font-size:11px;color:#aaa;">${t.cal>0?`${t.pro}g of ${proteinTarget}g target`:''}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:100px;background:#eee;border-radius:4px;height:6px;overflow:hidden;">
-            <div style="width:${Math.min(100,effPct)}%;height:100%;background:${effColor};border-radius:4px;transition:width 0.3s;"></div>
-          </div>
-          <span style="font-size:13px;font-weight:700;color:${effColor};min-width:36px;text-align:right;">${t.cal>0?effPct+'%':'—'}</span>
-        </div>
+      <div style="border-top:0.5px solid #f0f0f0;margin-top:10px;padding-top:10px;display:flex;align-items:baseline;justify-content:space-between;">
+        <span style="font-size:12px;color:#888;">Protein efficiency · ${t.cal>0?`${t.pro}g of ${proteinTarget}g target`:'log meals to see'}</span>
+        <span style="font-size:22px;font-weight:700;color:${effColor};">${t.cal>0?effPct+'%':'—'}</span>
       </div>
     </div>
     <div class="card">
