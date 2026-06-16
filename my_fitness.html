@@ -403,7 +403,7 @@ function renderDashboard() {
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
                 <div>
                   <div style="font-size:13px;font-weight:600;">${m.data.name}</div>
-                  <div style="font-size:11px;color:#888;">${m.data.time} · ${m.data.calories} kcal · P:${m.data.protein}g C:${m.data.carbs}g F:${m.data.fat}g</div>
+                  <div style="font-size:11px;color:#888;">${m.data.time} · ${m.data.calories} cal · P:${m.data.protein}g C:${m.data.carbs}g F:${m.data.fat}g</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;margin-left:8px;">
                   <div style="text-align:right;">
@@ -979,7 +979,7 @@ function renderDiet(){
         <div class="list-item" style="${m.id===editingMealId?'background:#f7f7f5;border-radius:8px;padding:4px 8px;margin:-4px -8px;':''}">
           <div>
             <div style="font-weight:600;">${m.data.name}</div>
-            <div style="font-size:11px;color:#888;">${m.data.time} · ${m.data.calories} kcal · P:${m.data.protein}g C:${m.data.carbs}g F:${m.data.fat}g</div>
+            <div style="font-size:11px;color:#888;">${m.data.time} · ${m.data.calories} cal · P:${m.data.protein}g C:${m.data.carbs}g F:${m.data.fat}g</div>
           </div>
           <div style="display:flex;gap:5px;">
             <button class="btn btn-sm" onclick="startEditMeal('${m.id}')">✎</button>
