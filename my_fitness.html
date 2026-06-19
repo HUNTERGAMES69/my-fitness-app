@@ -1759,13 +1759,12 @@ document.addEventListener('visibilitychange', () => {
 // ── EXERCISE LIBRARY ───────────────────────────────────────────────────────
 function getAllExerciseNames() {
   const names = new Set();
+  // From current plan days
   plan.days.forEach(d => {
     (d.exercises||[]).forEach(e => names.add(e.name));
   });
-  // Also pull from workout history
-  workoutHistory.forEach(row => {
-    (row.session.exercises||[]).forEach(n => names.add(n));
-  });
+  // From explicitly saved library entries (covers manually added + renamed)
+  Object.keys(exLibrary).forEach(n => names.add(n));
   return [...names].sort();
 }
 
@@ -1915,6 +1914,11 @@ function saveRenameExById(inp) {
   delete plan.exLibrary[oldName];
   plan.days.forEach(d => {
     (d.exercises||[]).forEach(e => { if(e.name === oldName) e.name = newName; });
+  });
+  // Update in-memory workout history so progression data follows the rename
+  workoutHistory.forEach(row => {
+    if(!row.session.exercises) return;
+    row.session.exercises = row.session.exercises.map(n => n === oldName ? newName : n);
   });
   savePlan();
   window._renamingEx = null;
