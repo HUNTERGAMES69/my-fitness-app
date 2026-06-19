@@ -1425,6 +1425,8 @@ function renderExEditorHTML(){
   const day=plan.days[editingDay];const type=dayType(day);
   if(type==='weights'){
     const exs=day.exercises||[];
+    const currentNames=new Set(exs.map(e=>e.name));
+    const libNames=getAllExerciseNames().filter(n=>!currentNames.has(n));
     return`<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
         <div class="card-title" style="margin-bottom:0;">${DAYS[editingDay]} — exercises</div>
@@ -1432,7 +1434,14 @@ function renderExEditorHTML(){
       </div>
       <div style="font-size:12px;color:#888;margin-bottom:0.6rem;">Exercises run in this order each round.</div>
       ${!exs.length?'<div style="font-size:13px;color:#aaa;margin-bottom:8px;">No exercises yet.</div>':exs.map((ex,ei)=>`<div class="list-item"><span style="font-size:11px;color:#bbb;width:18px;">${ei+1}</span><span style="flex:1;font-weight:600;">${ex.name}</span><button class="btn btn-sm" onclick="moveEx(${ei},-1)" style="visibility:${ei===0?'hidden':'visible'};">↑</button><button class="btn btn-sm" onclick="moveEx(${ei},1)" style="visibility:${ei===exs.length-1?'hidden':'visible'};">↓</button><button class="btn btn-danger" onclick="removeEx(${ei})">✕</button></div>`).join('')}
-      <div class="row" style="margin-top:0.75rem;"><input type="text" id="new-ex" placeholder="Exercise name" style="flex:2;" onkeydown="if(event.key==='Enter')addEx()"><button class="btn btn-primary" onclick="addEx()">Add</button></div>
+      <div style="margin-top:0.75rem;">
+        ${libNames.length?`<div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px;">FROM LIBRARY — tap to add</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
+          ${libNames.map(n=>`<button class="btn btn-sm" style="border-color:#AFA9EC;color:#3C3489;background:#EEEDFE;" onclick="addExFromLibrary('${n.replace(/'/g,"\\'")}')">+ ${n}</button>`).join('')}
+        </div>`:``}
+        <div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px;">${libNames.length?'OR TYPE A NEW ONE':'ADD EXERCISE'}</div>
+        <div class="row"><input type="text" id="new-ex" placeholder="Exercise name" style="flex:2;" onkeydown="if(event.key==='Enter')addEx()"><button class="btn btn-primary" onclick="addEx()">Add</button></div>
+      </div>
     </div>`;
   } else {
     const exs=day.cardioExercises||[];
@@ -1458,6 +1467,7 @@ function setDayType(i,type){
 function updateRounds(i,val){plan.days[i].rounds=parseInt(val)||3;savePlan();}
 function openExEditor(i){editingDay=editingDay===i?null:i;renderEditor();}
 function addEx(){const inp=el('new-ex');const name=inp.value.trim();if(!name)return;plan.days[editingDay].exercises.push({name});inp.value='';savePlan();renderEditor();}
+function addExFromLibrary(name){plan.days[editingDay].exercises.push({name});savePlan();renderEditor();}
 function removeEx(ei){plan.days[editingDay].exercises.splice(ei,1);savePlan();renderEditor();}
 function moveEx(ei,dir){const exs=plan.days[editingDay].exercises;const j=ei+dir;if(j<0||j>=exs.length)return;[exs[ei],exs[j]]=[exs[j],exs[ei]];savePlan();renderEditor();}
 function addCardioEx(){const name=el('new-cardio-ex').value.trim();if(!name)return;const subtype=el('new-cardio-type').value;if(!plan.days[editingDay].cardioExercises)plan.days[editingDay].cardioExercises=[];plan.days[editingDay].cardioExercises.push({id:Date.now().toString(),name,subtype});el('new-cardio-ex').value='';savePlan();renderEditor();}
@@ -1797,36 +1807,112 @@ function openExDetail(name) {
 
 function renderExLibrary() {
   const names = getAllExerciseNames();
+  const libOnlyNames = Object.keys(exLibrary).filter(n => !names.includes(n));
+  const allNames = [...names, ...libOnlyNames].sort();
+
   el('section-exlibrary').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">
       <button class="btn btn-sm" onclick="switchTab('plan')">← Back</button>
       <span style="font-size:16px;font-weight:600;">📖 Exercise Library</span>
     </div>
-    ${!names.length ? '<div class="card"><p style="font-size:13px;color:#888;">No exercises in your plan yet. Add exercises in Edit Plan first.</p></div>' :
-      names.map(name => {
+    <div class="card">
+      <div class="card-title" style="margin-bottom:0.6rem;">Add exercise</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="new-lib-ex" placeholder="Exercise name" style="flex:1;font-size:13px;" onkeydown="if(event.key==='Enter')addLibraryExercise()">
+        <button class="btn btn-primary" onclick="addLibraryExercise()">+ Add</button>
+      </div>
+    </div>
+    ${!allNames.length ? '<div class="card"><p style="font-size:13px;color:#888;">No exercises yet. Add one above or set up your plan in Edit Plan.</p></div>' :
+      allNames.map(name => {
         const hist = getExerciseHistory(name);
         const lib = exLibrary[name] || {};
         const lastSession = hist.length ? hist[hist.length-1] : null;
         const pr = hist.length ? Math.max(...hist.map(h => h.maxWeight)) : null;
         const trend = getTrend(hist);
-        return `<div class="card" style="cursor:pointer;" onclick="openExDetail('${name.replace(/'/g,"\'")}')" onmouseenter="this.style.background='#f7f7f5'" onmouseleave="this.style.background='#fff'">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
-            <div style="flex:1;">
-              <div style="font-size:14px;font-weight:600;margin-bottom:2px;">${name}</div>
-              ${lib.description ? `<div style="font-size:12px;color:#888;margin-bottom:4px;">${lib.description}</div>` : ''}
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
-                ${pr !== null && pr > 0 ? `<span class="badge badge-purple">🏆 PR: ${pr} lbs</span>` : ''}
-                ${lastSession ? `<span class="badge badge-gray">Last: ${lastSession.dateStr}</span>` : '<span class="badge badge-gray">No sessions yet</span>'}
-                ${hist.length ? `<span class="badge badge-green">${hist.length} session${hist.length>1?'s':''}</span>` : ''}
-              </div>
-            </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-              ${trend ? `<span style="font-size:18px;" title="${trend.label}">${trend.icon}</span>` : ''}
-              <span style="font-size:11px;color:#aaa;">→</span>
-            </div>
-          </div>
-        </div>`;
+        const safe = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const isRenaming = window._renamingEx === name;
+        return '<div class="card">' +
+          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">' +
+            '<div style="flex:1;cursor:pointer;" onclick="openExDetail(\'' + safe + '\')">' +
+              (isRenaming
+                ? '<div style="display:flex;gap:6px;margin-bottom:6px;" onclick="event.stopPropagation()">' +
+                    '<input type="text" id="rename-input" value="' + name.replace(/"/g,'&quot;') + '" style="flex:1;font-size:13px;" onkeydown="if(event.key===\'Enter\')saveRenameEx(\'' + safe + '\');if(event.key===\'Escape\')cancelRenameEx()">' +
+                    '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();saveRenameEx(\'' + safe + '\')">Save</button>' +
+                    '<button class="btn btn-sm" onclick="event.stopPropagation();cancelRenameEx()">Cancel</button>' +
+                  '</div>'
+                : '<div style="font-size:14px;font-weight:600;margin-bottom:2px;">' + name + '</div>') +
+              (lib.description ? '<div style="font-size:12px;color:#888;margin-bottom:4px;">' + lib.description + '</div>' : '') +
+              '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">' +
+                (pr !== null && pr > 0 ? '<span class="badge badge-purple">🏆 PR: ' + pr + ' lbs</span>' : '') +
+                (lastSession ? '<span class="badge badge-gray">Last: ' + lastSession.dateStr + '</span>' : '<span class="badge badge-gray">No sessions yet</span>') +
+                (hist.length ? '<span class="badge badge-green">' + hist.length + ' session' + (hist.length>1?'s':'') + '</span>' : '') +
+              '</div>' +
+            '</div>' +
+            '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">' +
+              (trend ? '<span style="font-size:16px;">' + trend.icon + '</span>' : '') +
+              '<div style="display:flex;gap:4px;">' +
+                '<button class="btn btn-sm" onclick="event.stopPropagation();startRenameEx(\'' + safe + '\')" title="Rename">✎</button>' +
+                '<button class="btn btn-danger" onclick="event.stopPropagation();deleteLibraryExercise(\'' + safe + '\')" title="Delete">✕</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
       }).join('')}`;
+}
+
+function addLibraryExercise() {
+  const inp = el('new-lib-ex');
+  const name = inp ? inp.value.trim() : '';
+  if(!name) return;
+  if(!exLibrary[name]) exLibrary[name] = {description:'', notes:''};
+  if(!plan.exLibrary) plan.exLibrary = {};
+  plan.exLibrary[name] = exLibrary[name];
+  savePlan();
+  inp.value = '';
+  renderExLibrary();
+}
+
+function startRenameEx(name) {
+  window._renamingEx = name;
+  renderExLibrary();
+  setTimeout(() => { const inp = el('rename-input'); if(inp) inp.focus(); }, 50);
+}
+
+function cancelRenameEx() {
+  window._renamingEx = null;
+  renderExLibrary();
+}
+
+function saveRenameEx(oldName) {
+  const inp = el('rename-input');
+  const newName = inp ? inp.value.trim() : '';
+  if(!newName || newName === oldName) { cancelRenameEx(); return; }
+  if(exLibrary[oldName]) exLibrary[newName] = {...exLibrary[oldName]};
+  delete exLibrary[oldName];
+  if(!plan.exLibrary) plan.exLibrary = {};
+  if(plan.exLibrary[oldName]) plan.exLibrary[newName] = {...plan.exLibrary[oldName]};
+  delete plan.exLibrary[oldName];
+  plan.days.forEach(d => {
+    (d.exercises||[]).forEach(e => { if(e.name === oldName) e.name = newName; });
+  });
+  savePlan();
+  window._renamingEx = null;
+  renderExLibrary();
+}
+
+function deleteLibraryExercise(name) {
+  const hist = getExerciseHistory(name);
+  const msg = hist.length
+    ? 'Delete "' + name + '" from the library? This won\'t delete its workout history (' + hist.length + ' sessions), but it will be removed from any workout days in your plan.'
+    : 'Delete "' + name + '" from the library? It will also be removed from any workout days in your plan.';
+  if(!confirm(msg)) return;
+  delete exLibrary[name];
+  if(plan.exLibrary) delete plan.exLibrary[name];
+  plan.days.forEach(d => {
+    if(d.exercises) d.exercises = d.exercises.filter(e => e.name !== name);
+  });
+  savePlan();
+  renderExLibrary();
 }
 
 function getTrend(hist) {
