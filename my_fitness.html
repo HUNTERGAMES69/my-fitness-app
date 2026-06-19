@@ -1823,69 +1823,66 @@ function renderExLibrary() {
       </div>
     </div>
     ${!allNames.length ? '<div class="card"><p style="font-size:13px;color:#888;">No exercises yet. Add one above or set up your plan in Edit Plan.</p></div>' :
-      allNames.map(name => {
+      allNames.map((name,idx) => {
         const hist = getExerciseHistory(name);
         const lib = exLibrary[name] || {};
         const lastSession = hist.length ? hist[hist.length-1] : null;
         const pr = hist.length ? Math.max(...hist.map(h => h.maxWeight)) : null;
         const trend = getTrend(hist);
-        const safe = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
         const isRenaming = window._renamingEx === name;
-        return '<div class="card">' +
-          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">' +
-            '<div style="flex:1;cursor:pointer;" onclick="openExDetail(\'' + safe + '\')">' +
-              (isRenaming
-                ? '<div style="display:flex;gap:6px;margin-bottom:6px;" onclick="event.stopPropagation()">' +
-                    '<input type="text" id="rename-input" value="' + name.replace(/"/g,'&quot;') + '" style="flex:1;font-size:13px;" onkeydown="if(event.key===\'Enter\')saveRenameEx(\'' + safe + '\');if(event.key===\'Escape\')cancelRenameEx()">' +
-                    '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();saveRenameEx(\'' + safe + '\')">Save</button>' +
-                    '<button class="btn btn-sm" onclick="event.stopPropagation();cancelRenameEx()">Cancel</button>' +
-                  '</div>'
-                : '<div style="font-size:14px;font-weight:600;margin-bottom:2px;">' + name + '</div>') +
-              (lib.description ? '<div style="font-size:12px;color:#888;margin-bottom:4px;">' + lib.description + '</div>' : '') +
-              '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">' +
-                (pr !== null && pr > 0 ? '<span class="badge badge-purple">🏆 PR: ' + pr + ' lbs</span>' : '') +
-                (lastSession ? '<span class="badge badge-gray">Last: ' + lastSession.dateStr + '</span>' : '<span class="badge badge-gray">No sessions yet</span>') +
-                (hist.length ? '<span class="badge badge-green">' + hist.length + ' session' + (hist.length>1?'s':'') + '</span>' : '') +
-              '</div>' +
-            '</div>' +
-            '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">' +
-              (trend ? '<span style="font-size:16px;">' + trend.icon + '</span>' : '') +
-              '<div style="display:flex;gap:4px;">' +
-                '<button class="btn btn-sm" onclick="event.stopPropagation();startRenameEx(\'' + safe + '\')" title="Rename">✎</button>' +
-                '<button class="btn btn-danger" onclick="event.stopPropagation();deleteLibraryExercise(\'' + safe + '\')" title="Delete">✕</button>' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
+        const eid = 'ex-' + idx;
+        return \`<div class="card" data-exname="\${name.replace(/"/g,'&quot;')}">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div style="flex:1;cursor:pointer;" onclick="exCardClick(this)">
+              \${isRenaming
+                ? \`<div style="display:flex;gap:6px;margin-bottom:6px;" onclick="event.stopPropagation()">
+                    <input type="text" id="rename-input" value="\${name.replace(/"/g,'&quot;')}" style="flex:1;font-size:13px;" onkeydown="if(event.key==='Enter')saveRenameExById(this);if(event.key==='Escape')cancelRenameEx()">
+                    <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();saveRenameExById(document.getElementById('rename-input'))">Save</button>
+                    <button class="btn btn-sm" onclick="event.stopPropagation();cancelRenameEx()">Cancel</button>
+                   </div>\`
+                : \`<div style="font-size:14px;font-weight:600;margin-bottom:2px;">\${name}</div>\`}
+              \${lib.description ? \`<div style="font-size:12px;color:#888;margin-bottom:4px;">\${lib.description}</div>\` : ''}
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+                \${pr !== null && pr > 0 ? \`<span class="badge badge-purple">🏆 PR: \${pr} lbs</span>\` : ''}
+                \${lastSession ? \`<span class="badge badge-gray">Last: \${lastSession.dateStr}</span>\` : '<span class="badge badge-gray">No sessions yet</span>'}
+                \${hist.length ? \`<span class="badge badge-green">\${hist.length} session\${hist.length>1?'s':''}</span>\` : ''}
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
+              \${trend ? \`<span style="font-size:16px;">\${trend.icon}</span>\` : ''}
+              <div style="display:flex;gap:4px;">
+                <button class="btn btn-sm" title="Rename" onclick="event.stopPropagation();startRenameExCard(this)">✎</button>
+                <button class="btn btn-danger" title="Delete" onclick="event.stopPropagation();deleteExCard(this)">✕</button>
+              </div>
+            </div>
+          </div>
+        </div>\`;
       }).join('')}`;
 }
 
-function addLibraryExercise() {
-  const inp = el('new-lib-ex');
-  const name = inp ? inp.value.trim() : '';
-  if(!name) return;
-  if(!exLibrary[name]) exLibrary[name] = {description:'', notes:''};
-  if(!plan.exLibrary) plan.exLibrary = {};
-  plan.exLibrary[name] = exLibrary[name];
-  savePlan();
-  inp.value = '';
-  renderExLibrary();
+function getCardName(el) {
+  const card = el.closest('[data-exname]');
+  return card ? card.getAttribute('data-exname') : null;
 }
 
-function startRenameEx(name) {
+function exCardClick(el) {
+  const name = getCardName(el);
+  if(name) openExDetail(name);
+}
+
+function startRenameExCard(btn) {
+  const name = getCardName(btn);
+  if(!name) return;
   window._renamingEx = name;
   renderExLibrary();
   setTimeout(() => { const inp = el('rename-input'); if(inp) inp.focus(); }, 50);
 }
 
-function cancelRenameEx() {
-  window._renamingEx = null;
-  renderExLibrary();
-}
-
-function saveRenameEx(oldName) {
-  const inp = el('rename-input');
-  const newName = inp ? inp.value.trim() : '';
+function saveRenameExById(inp) {
+  const card = inp.closest('[data-exname]');
+  const oldName = card ? card.getAttribute('data-exname') : null;
+  if(!oldName) return;
+  const newName = inp.value.trim();
   if(!newName || newName === oldName) { cancelRenameEx(); return; }
   if(exLibrary[oldName]) exLibrary[newName] = {...exLibrary[oldName]};
   delete exLibrary[oldName];
@@ -1900,10 +1897,17 @@ function saveRenameEx(oldName) {
   renderExLibrary();
 }
 
-function deleteLibraryExercise(name) {
+function cancelRenameEx() {
+  window._renamingEx = null;
+  renderExLibrary();
+}
+
+function deleteExCard(btn) {
+  const name = getCardName(btn);
+  if(!name) return;
   const hist = getExerciseHistory(name);
   const msg = hist.length
-    ? 'Delete "' + name + '" from the library? This won\'t delete its workout history (' + hist.length + ' sessions), but it will be removed from any workout days in your plan.'
+    ? 'Delete "' + name + '" from the library? This won't delete its workout history (' + hist.length + ' sessions), but it will be removed from any workout days in your plan.'
     : 'Delete "' + name + '" from the library? It will also be removed from any workout days in your plan.';
   if(!confirm(msg)) return;
   delete exLibrary[name];
@@ -1912,6 +1916,18 @@ function deleteLibraryExercise(name) {
     if(d.exercises) d.exercises = d.exercises.filter(e => e.name !== name);
   });
   savePlan();
+  renderExLibrary();
+}
+
+function addLibraryExercise() {
+  const inp = el('new-lib-ex');
+  const name = inp ? inp.value.trim() : '';
+  if(!name) return;
+  if(!exLibrary[name]) exLibrary[name] = {description:'', notes:''};
+  if(!plan.exLibrary) plan.exLibrary = {};
+  plan.exLibrary[name] = exLibrary[name];
+  savePlan();
+  inp.value = '';
   renderExLibrary();
 }
 
