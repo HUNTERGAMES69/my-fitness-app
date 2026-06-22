@@ -363,8 +363,12 @@ function toggleCoach() {
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
 function renderDashboard() {
-  const weekAgo=new Date(); weekAgo.setDate(weekAgo.getDate()-7);
-  const weekW=workoutHistory.filter(w=>new Date(w.created_at)>weekAgo);
+  const now=new Date();
+  const dayOfWeek=now.getDay();
+  const mondayOffset=dayOfWeek===0?-6:1-dayOfWeek;
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()+mondayOffset);weekStart.setHours(0,0,0,0);
+  const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+7);
+  const weekW=workoutHistory.filter(w=>{const d=new Date(w.created_at);return d>=weekStart&&d<weekEnd;});
   const tm=todayMeals();
   const t=macroTotals(tm);
   const cur=weights[0], start=weights[weights.length-1];
@@ -372,11 +376,6 @@ function renderDashboard() {
   const proteinTarget=t.cal>0?Math.round(t.cal/10):0;
   const effPct=proteinTarget>0?Math.round(t.pro/proteinTarget*100):0;
   const effColor=effPct>=100?'#1D9E75':effPct>=75?'#EF9F27':'#D85A30';
-  const now=new Date();
-  const dayOfWeek=now.getDay();
-  const mondayOffset=dayOfWeek===0?-6:1-dayOfWeek;
-  const weekStart=new Date(now);weekStart.setDate(now.getDate()+mondayOffset);weekStart.setHours(0,0,0,0);
-  const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+7);
   const recent=[...workoutHistory].reverse().filter(w=>{const d=new Date(w.created_at);return d>=weekStart&&d<weekEnd;});
 
   el('section-dashboard').innerHTML=`
