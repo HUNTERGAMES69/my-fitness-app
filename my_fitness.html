@@ -457,6 +457,22 @@ function renderDashboard() {
           <span><span style="display:inline-block;width:24px;height:3px;background:#461D7C;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Trend</span>
         </div>
       </div>
+      <div id="weight-stat-strip-dash-chart" style="display:flex;align-items:center;justify-content:space-around;background:#f7f7f5;border-radius:8px;padding:8px;margin-bottom:8px;gap:8px;">
+        <div style="text-align:center;">
+          <div id="wstat-avg-dash-chart" style="font-size:16px;font-weight:600;color:#461D7C;line-height:1.1;">—</div>
+          <div style="font-size:10px;color:#aaa;margin-top:2px;">avg (10 days)</div>
+        </div>
+        <div style="width:0.5px;background:#e5e5e5;align-self:stretch;"></div>
+        <div style="text-align:center;">
+          <div id="wstat-low-dash-chart" style="font-size:16px;font-weight:600;color:#1D9E75;line-height:1.1;">—</div>
+          <div style="font-size:10px;color:#aaa;margin-top:2px;">low</div>
+        </div>
+        <div style="width:0.5px;background:#e5e5e5;align-self:stretch;"></div>
+        <div style="text-align:center;">
+          <div id="wstat-high-dash-chart" style="font-size:16px;font-weight:600;color:#D85A30;line-height:1.1;">—</div>
+          <div style="font-size:10px;color:#aaa;margin-top:2px;">high</div>
+        </div>
+      </div>
       <div style="position:relative;height:180px;"><canvas id="dash-chart" role="img" aria-label="10-day weight bar chart with trend line">Weight trend over last 10 days.</canvas></div>
     </div>
     <div class="card">
@@ -591,6 +607,25 @@ function renderWeightChart(canvasId, small) {
   });
   if(canvasId==='dash-chart') dashChart=chart;
   else weightChart=chart;
+
+  // Populate avg / low / high strip
+  const validVals = dayData.filter(v => v !== null);
+  const avgEl  = el('wstat-avg-'  + canvasId);
+  const lowEl  = el('wstat-low-'  + canvasId);
+  const highEl = el('wstat-high-' + canvasId);
+  if(avgEl) {
+    const unit = weights.length ? weights[0].unit : 'lbs';
+    if(validVals.length) {
+      const avg  = parseFloat((validVals.reduce((a,b)=>a+b,0)/validVals.length).toFixed(1));
+      const low  = Math.min(...validVals);
+      const high = Math.max(...validVals);
+      avgEl.textContent  = avg  + ' ' + unit;
+      lowEl.textContent  = low  + ' ' + unit;
+      highEl.textContent = high + ' ' + unit;
+    } else {
+      avgEl.textContent = lowEl.textContent = highEl.textContent = '—';
+    }
+  }
 }
 
 let macroView = 'cp';
@@ -1279,6 +1314,22 @@ function renderWeight(){
           <span><span style="display:inline-block;width:10px;height:10px;background:#1D9E75;border-radius:2px;margin-right:3px;"></span>Down</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:#D85A30;border-radius:2px;margin-right:3px;"></span>Up</span>
           <span><span style="display:inline-block;width:24px;height:3px;background:#461D7C;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Trend</span>
+        </div>
+      </div>
+      <div id="weight-stat-strip-weight-chart" style="display:flex;align-items:center;justify-content:space-around;background:#f7f7f5;border-radius:8px;padding:8px;margin-bottom:8px;gap:8px;">
+        <div style="text-align:center;">
+          <div id="wstat-avg-weight-chart" style="font-size:16px;font-weight:600;color:#461D7C;line-height:1.1;">—</div>
+          <div style="font-size:10px;color:#aaa;margin-top:2px;">avg (10 days)</div>
+        </div>
+        <div style="width:0.5px;background:#e5e5e5;align-self:stretch;"></div>
+        <div style="text-align:center;">
+          <div id="wstat-low-weight-chart" style="font-size:16px;font-weight:600;color:#1D9E75;line-height:1.1;">—</div>
+          <div style="font-size:10px;color:#aaa;margin-top:2px;">low</div>
+        </div>
+        <div style="width:0.5px;background:#e5e5e5;align-self:stretch;"></div>
+        <div style="text-align:center;">
+          <div id="wstat-high-weight-chart" style="font-size:16px;font-weight:600;color:#D85A30;line-height:1.1;">—</div>
+          <div style="font-size:10px;color:#aaa;margin-top:2px;">high</div>
         </div>
       </div>
       <div style="position:relative;height:200px;"><canvas id="weight-chart" role="img" aria-label="10-day weight bar chart with trend line">Weight history over time.</canvas></div>
