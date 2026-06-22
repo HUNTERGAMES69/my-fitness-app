@@ -607,7 +607,7 @@ function switchMacroView(view) {
 }
 
 function macroAvg(arr) {
-  const vals = arr.filter(v => v > 0);
+  const vals = arr.slice(0, 9).filter(v => v > 0); // exclude today (last element)
   return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
 }
 
