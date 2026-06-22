@@ -174,6 +174,8 @@ canvas{display:block;}
   <div id="section-history" class="section"></div>
   <div id="section-editor" class="section"></div>
   <div id="section-coach" class="section"></div>
+  <div id="section-exdetail" class="section"></div>
+  <div id="section-exlibrary" class="section"></div>
 </div>
 <button id="coach-fab" onclick="toggleCoach()" title="Ask your coach">💬</button>
 
@@ -244,6 +246,9 @@ let meals = [];
 let weights = [];
 let foodLibrary = [];
 let planRowId = null;
+let exLibrary = {};
+let currentExName = null;
+let exDetailChart1 = null, exDetailChart2 = null;
 let coachMessages = [];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -280,6 +285,7 @@ async function loadAll() {
       plan = planRows[0].data;
       planRowId = planRows[0].id;
       plan.days.forEach(d=>{ if(!d.rounds)d.rounds=3; if(!d.exercises)d.exercises=[]; if(!d.cardioExercises)d.cardioExercises=[]; });
+      exLibrary = plan.exLibrary || {};
     }
     workoutHistory = histRows;
     meals = mealRows;
@@ -340,6 +346,8 @@ function switchTab(name) {
   if(name==='history') renderHistory();
   if(name==='editor') renderEditor();
   if(name==='coach') renderCoach();
+  if(name==='exlibrary') renderExLibrary();
+  if(name==='exdetail') renderExDetail();
   // Show/hide FAB — hide on coach tab since we're already there
   const fab=el('coach-fab');
   if(fab) fab.style.display=name==='coach'?'none':'flex';
@@ -355,8 +363,12 @@ function toggleCoach() {
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
 function renderDashboard() {
-  const weekAgo=new Date(); weekAgo.setDate(weekAgo.getDate()-7);
-  const weekW=workoutHistory.filter(w=>new Date(w.created_at)>weekAgo);
+  const now=new Date();
+  const dayOfWeek=now.getDay();
+  const mondayOffset=dayOfWeek===0?-6:1-dayOfWeek;
+  const weekStart=new Date(now);weekStart.setDate(now.getDate()+mondayOffset);weekStart.setHours(0,0,0,0);
+  const weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+7);
+  const weekW=workoutHistory.filter(w=>{const d=new Date(w.created_at);return d>=weekStart&&d<weekEnd;});
   const tm=todayMeals();
   const t=macroTotals(tm);
   const cur=weights[0], start=weights[weights.length-1];
@@ -364,7 +376,7 @@ function renderDashboard() {
   const proteinTarget=t.cal>0?Math.round(t.cal/10):0;
   const effPct=proteinTarget>0?Math.round(t.pro/proteinTarget*100):0;
   const effColor=effPct>=100?'#1D9E75':effPct>=75?'#EF9F27':'#D85A30';
-  const recent=[...workoutHistory].reverse().slice(0,3);
+  const recent=[...workoutHistory].reverse().filter(w=>{const d=new Date(w.created_at);return d>=weekStart&&d<weekEnd;});
 
   el('section-dashboard').innerHTML=`
     <div style="font-size:13px;color:#888;margin-bottom:0.75rem;">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
@@ -476,7 +488,7 @@ function renderDashboard() {
       <div style="position:relative;height:180px;"><canvas id="dash-chart" role="img" aria-label="10-day weight bar chart with trend line">Weight trend over last 10 days.</canvas></div>
     </div>
     <div class="card">
-      <div class="card-title">Recent workouts</div>
+      <div class="card-title">This Week's Workouts</div>
       ${recent.length?recent.map(w=>{
         const h=w.session;
         const stats=h.type==='cardio'
@@ -490,7 +502,7 @@ function renderDashboard() {
             <div style="font-weight:600;">${h.dayName} &nbsp;<span style="font-weight:400;color:#888;font-size:12px;">${fmtDate(w.created_at)}</span></div>
             <div style="font-size:12px;color:#888;margin-top:2px;">${badge} ${stats}</div>
           </div>
-        </div>`;}).join(''):'<div style="font-size:13px;color:#888;">None yet — finish a workout to see it here</div>'}
+        </div>`;}).join(''):'<div style="font-size:13px;color:#888;">No workouts logged this week yet.</div>'}
     </div>
     <button class="btn" onclick="exportAll()" style="width:100%;justify-content:center;padding:10px;font-size:13px;">⬇ Data Export</button>`;
 
@@ -943,10 +955,13 @@ function renderPlan(){
         </div>
         ${type!=='rest'&&exCount>0?`<button class="btn btn-sm" onclick="startSession(${i});switchTab('workout');">▶ Start</button>`:''}
       </div>
-      ${type==='weights'&&exCount>0?`<div style="margin-top:6px;font-size:12px;color:#888;">${(day.exercises||[]).map(e=>e.name).join(' → ')}</div>`:''}
+      ${type==='weights'&&exCount>0?`<div style="margin-top:6px;font-size:12px;color:#888;">${(day.exercises||[]).map(e=>'<span onclick="openExDetail(\'' + e.name.replace(/'/g,"\\\\'") + '\')" style="cursor:pointer;text-decoration:underline;text-decoration-color:#ccc;text-underline-offset:2px;">' + e.name + '</span>').join(' → ')}</div>`:''}
       ${type==='cardio'&&exCount>0?`<div style="margin-top:6px;font-size:12px;color:#888;">${(day.cardioExercises||[]).map(e=>`${e.name} (${e.subtype})`).join(' · ')}</div>`:''}
     </div>`;}).join('')+
-    `<button class="btn btn-primary" onclick="switchTab('editor')" style="margin-top:0.5rem;">✎ Edit Plan</button>`;
+    `<div style="display:flex;gap:8px;margin-top:0.5rem;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="switchTab('editor')">✎ Edit Plan</button>
+    <button class="btn" onclick="switchTab('exlibrary')">📖 Exercise Library</button>
+  </div>`;
 }
 
 // ── DIET ───────────────────────────────────────────────────────────────────
@@ -1501,6 +1516,8 @@ function renderExEditorHTML(){
   const day=plan.days[editingDay];const type=dayType(day);
   if(type==='weights'){
     const exs=day.exercises||[];
+    const currentNames=new Set(exs.map(e=>e.name));
+    const libNames=getAllExerciseNames().filter(n=>!currentNames.has(n));
     return`<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
         <div class="card-title" style="margin-bottom:0;">${DAYS[editingDay]} — exercises</div>
@@ -1508,7 +1525,14 @@ function renderExEditorHTML(){
       </div>
       <div style="font-size:12px;color:#888;margin-bottom:0.6rem;">Exercises run in this order each round.</div>
       ${!exs.length?'<div style="font-size:13px;color:#aaa;margin-bottom:8px;">No exercises yet.</div>':exs.map((ex,ei)=>`<div class="list-item"><span style="font-size:11px;color:#bbb;width:18px;">${ei+1}</span><span style="flex:1;font-weight:600;">${ex.name}</span><button class="btn btn-sm" onclick="moveEx(${ei},-1)" style="visibility:${ei===0?'hidden':'visible'};">↑</button><button class="btn btn-sm" onclick="moveEx(${ei},1)" style="visibility:${ei===exs.length-1?'hidden':'visible'};">↓</button><button class="btn btn-danger" onclick="removeEx(${ei})">✕</button></div>`).join('')}
-      <div class="row" style="margin-top:0.75rem;"><input type="text" id="new-ex" placeholder="Exercise name" style="flex:2;" onkeydown="if(event.key==='Enter')addEx()"><button class="btn btn-primary" onclick="addEx()">Add</button></div>
+      <div style="margin-top:0.75rem;">
+        ${libNames.length?`<div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px;">FROM LIBRARY — tap to add</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
+          ${libNames.map(n=>`<button class="btn btn-sm" style="border-color:#AFA9EC;color:#3C3489;background:#EEEDFE;" onclick="addExFromLibrary('${n.replace(/'/g,"\'")}')">+ ${n}</button>`).join('')}
+        </div>`:''}
+        <div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px;">${libNames.length?'OR TYPE A NEW ONE':'ADD EXERCISE'}</div>
+        <div class="row"><input type="text" id="new-ex" placeholder="Exercise name" style="flex:2;" onkeydown="if(event.key==='Enter')addEx()"><button class="btn btn-primary" onclick="addEx()">Add</button></div>
+      </div>
     </div>`;
   } else {
     const exs=day.cardioExercises||[];
@@ -1534,6 +1558,7 @@ function setDayType(i,type){
 function updateRounds(i,val){plan.days[i].rounds=parseInt(val)||3;savePlan();}
 function openExEditor(i){editingDay=editingDay===i?null:i;renderEditor();}
 function addEx(){const inp=el('new-ex');const name=inp.value.trim();if(!name)return;plan.days[editingDay].exercises.push({name});inp.value='';savePlan();renderEditor();}
+function addExFromLibrary(name){plan.days[editingDay].exercises.push({name});savePlan();renderEditor();}
 function removeEx(ei){plan.days[editingDay].exercises.splice(ei,1);savePlan();renderEditor();}
 function moveEx(ei,dir){const exs=plan.days[editingDay].exercises;const j=ei+dir;if(j<0||j>=exs.length)return;[exs[ei],exs[j]]=[exs[j],exs[ei]];savePlan();renderEditor();}
 function addCardioEx(){const name=el('new-cardio-ex').value.trim();if(!name)return;const subtype=el('new-cardio-type').value;if(!plan.days[editingDay].cardioExercises)plan.days[editingDay].cardioExercises=[];plan.days[editingDay].cardioExercises.push({id:Date.now().toString(),name,subtype});el('new-cardio-ex').value='';savePlan();renderEditor();}
@@ -1799,7 +1824,7 @@ async function refreshData() {
       sbGet('food_library','?order=created_at.asc'),
       sbGet('coach_messages','?order=created_at.asc'),
     ]);
-    if(planRows.length){ plan=planRows[0].data; planRowId=planRows[0].id; plan.days.forEach(d=>{if(!d.rounds)d.rounds=3;if(!d.exercises)d.exercises=[];if(!d.cardioExercises)d.cardioExercises=[];}); }
+    if(planRows.length){ plan=planRows[0].data; planRowId=planRows[0].id; plan.days.forEach(d=>{if(!d.rounds)d.rounds=3;if(!d.exercises)d.exercises=[];if(!d.cardioExercises)d.cardioExercises=[];}); exLibrary=plan.exLibrary||{}; }
     workoutHistory=histRows; meals=mealRows; weights=weightRows;
     foodLibrary=libRows.length?libRows:DEFAULT_LIBRARY.slice();
     coachMessages=coachRows;
@@ -1820,6 +1845,264 @@ document.addEventListener('visibilitychange', () => {
     lastHidden = Date.now();
   }
 });
+
+
+// ── EXERCISE LIBRARY ───────────────────────────────────────────────────────
+function getAllExerciseNames() {
+  const names = new Set();
+  plan.days.forEach(d => { (d.exercises||[]).forEach(e => names.add(e.name)); });
+  Object.keys(exLibrary).forEach(n => names.add(n));
+  return [...names].sort();
+}
+
+function getExerciseHistory(exName) {
+  const results = [];
+  workoutHistory.forEach(row => {
+    const h = row.session;
+    if(h.type === 'cardio' || !h.exercises) return;
+    const ei = h.exercises.indexOf(exName);
+    if(ei < 0) return;
+    const plannedRounds = h.plannedRounds || h.totalRounds || 1;
+    const sets = [];
+    for(let r = 1; r <= plannedRounds; r++) {
+      const s = h.logged && h.logged[r] && h.logged[r][ei];
+      if(s && s.reps) sets.push({weight: s.weight||0, reps: s.reps, round: r});
+    }
+    if(!sets.length) return;
+    const volume = sets.reduce((a, s) => a + (s.weight||0) * s.reps, 0);
+    const maxWeight = Math.max(...sets.map(s => s.weight||0));
+    results.push({ date: new Date(row.created_at), dateStr: fmtDate(row.created_at), sets, volume, maxWeight });
+  });
+  return results.sort((a,b) => a.date - b.date);
+}
+
+function openExDetail(name) {
+  currentExName = name;
+  if(exDetailChart1){exDetailChart1.destroy();exDetailChart1=null;}
+  if(exDetailChart2){exDetailChart2.destroy();exDetailChart2=null;}
+  switchTab('exdetail');
+}
+
+function getTrend(hist) {
+  if(hist.length < 3) return null;
+  const recent = hist.slice(-3).map(h => h.maxWeight);
+  const avg1 = (recent[0]+recent[1])/2;
+  const diff = recent[2] - avg1;
+  if(diff > 2) return {icon:'📈', label:'Weight trending up'};
+  if(diff < -2) return {icon:'📉', label:'Weight trending down'};
+  return {icon:'➡️', label:'Weight holding steady'};
+}
+
+function getCardName(node) {
+  const card = node.closest('[data-exname]');
+  return card ? card.getAttribute('data-exname') : null;
+}
+function exCardClick(node) { const name = getCardName(node); if(name) openExDetail(name); }
+function startRenameExCard(btn) {
+  const name = getCardName(btn); if(!name) return;
+  window._renamingEx = name; renderExLibrary();
+  setTimeout(() => { const inp = el('rename-input'); if(inp) inp.focus(); }, 50);
+}
+function saveRenameExById(inp) {
+  const card = inp.closest('[data-exname]');
+  const oldName = card ? card.getAttribute('data-exname') : null;
+  if(!oldName) return;
+  const newName = inp.value.trim();
+  if(!newName || newName === oldName) { cancelRenameEx(); return; }
+  if(exLibrary[oldName]) exLibrary[newName] = {...exLibrary[oldName]};
+  delete exLibrary[oldName];
+  if(!plan.exLibrary) plan.exLibrary = {};
+  if(plan.exLibrary[oldName]) plan.exLibrary[newName] = {...plan.exLibrary[oldName]};
+  delete plan.exLibrary[oldName];
+  plan.days.forEach(d => { (d.exercises||[]).forEach(e => { if(e.name===oldName) e.name=newName; }); });
+  workoutHistory.forEach(row => {
+    if(!row.session.exercises) return;
+    row.session.exercises = row.session.exercises.map(n => n===oldName?newName:n);
+  });
+  savePlan(); window._renamingEx = null; renderExLibrary();
+}
+function cancelRenameEx() { window._renamingEx = null; renderExLibrary(); }
+function deleteExCard(btn) {
+  const name = getCardName(btn); if(!name) return;
+  const hist = getExerciseHistory(name);
+  const msg = hist.length
+    ? 'Delete "' + name + '" from the library? This won\'t delete its workout history (' + hist.length + ' sessions), but it will be removed from any workout days in your plan.'
+    : 'Delete "' + name + '" from the library? It will also be removed from any workout days in your plan.';
+  if(!confirm(msg)) return;
+  delete exLibrary[name];
+  if(plan.exLibrary) delete plan.exLibrary[name];
+  plan.days.forEach(d => { if(d.exercises) d.exercises = d.exercises.filter(e => e.name !== name); });
+  savePlan(); renderExLibrary();
+}
+
+function renderExLibrary() {
+  const names = getAllExerciseNames();
+  const libOnlyNames = Object.keys(exLibrary).filter(n => !names.includes(n));
+  const allNames = [...names, ...libOnlyNames].sort();
+  let html = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">'
+    + '<button class="btn btn-sm" onclick="switchTab(\'plan\')">← Back</button>'
+    + '<span style="font-size:16px;font-weight:600;">📖 Exercise Library</span>'
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-title" style="margin-bottom:0.6rem;">Add exercise</div>'
+    + '<div style="display:flex;gap:8px;">'
+    + '<input type="text" id="new-lib-ex" placeholder="Exercise name" style="flex:1;font-size:13px;" onkeydown="if(event.key===\'Enter\')addLibraryExercise()">'
+    + '<button class="btn btn-primary" onclick="addLibraryExercise()">+ Add</button>'
+    + '</div></div>';
+  if(!allNames.length) {
+    html += '<div class="card"><p style="font-size:13px;color:#888;">No exercises yet. Add one above or set up your plan in Edit Plan.</p></div>';
+  } else {
+    allNames.forEach(name => {
+      const hist = getExerciseHistory(name);
+      const lib = exLibrary[name] || {};
+      const lastSession = hist.length ? hist[hist.length-1] : null;
+      const pr = hist.length ? Math.max(...hist.map(h => h.maxWeight)) : null;
+      const trend = getTrend(hist);
+      const isRenaming = window._renamingEx === name;
+      const safeName = name.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += '<div class="card" data-exname="' + safeName + '">';
+      html += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">';
+      html += '<div style="flex:1;cursor:pointer;" onclick="exCardClick(this)">';
+      if(isRenaming) {
+        html += '<div style="display:flex;gap:6px;margin-bottom:6px;" onclick="event.stopPropagation()">'
+          + '<input type="text" id="rename-input" value="' + safeName + '" style="flex:1;font-size:13px;" onkeydown="if(event.key===\'Enter\')saveRenameExById(this);if(event.key===\'Escape\')cancelRenameEx()">'
+          + '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();saveRenameExById(document.getElementById(\'rename-input\'))">Save</button>'
+          + '<button class="btn btn-sm" onclick="event.stopPropagation();cancelRenameEx()">Cancel</button>'
+          + '</div>';
+      } else {
+        html += '<div style="font-size:14px;font-weight:600;margin-bottom:2px;">' + name + '</div>';
+      }
+      if(lib.description) html += '<div style="font-size:12px;color:#888;margin-bottom:4px;">' + lib.description + '</div>';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">';
+      if(pr !== null && pr > 0) html += '<span class="badge badge-purple">🏆 PR: ' + pr + ' lbs</span>';
+      html += lastSession ? '<span class="badge badge-gray">Last: ' + lastSession.dateStr + '</span>' : '<span class="badge badge-gray">No sessions yet</span>';
+      if(hist.length) html += '<span class="badge badge-green">' + hist.length + ' session' + (hist.length>1?'s':'') + '</span>';
+      html += '</div></div>';
+      html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">';
+      if(trend) html += '<span style="font-size:16px;">' + trend.icon + '</span>';
+      html += '<div style="display:flex;gap:4px;">'
+        + '<button class="btn btn-sm" title="Rename" onclick="event.stopPropagation();startRenameExCard(this)">✎</button>'
+        + '<button class="btn btn-danger" title="Delete" onclick="event.stopPropagation();deleteExCard(this)">✕</button>'
+        + '</div></div>';
+      html += '</div></div>';
+    });
+  }
+  el('section-exlibrary').innerHTML = html;
+}
+
+function addLibraryExercise() {
+  const inp = el('new-lib-ex');
+  const name = inp ? inp.value.trim() : '';
+  if(!name) return;
+  if(!exLibrary[name]) exLibrary[name] = {description:'', notes:''};
+  if(!plan.exLibrary) plan.exLibrary = {};
+  plan.exLibrary[name] = exLibrary[name];
+  savePlan(); inp.value = ''; renderExLibrary();
+}
+
+function renderExDetail() {
+  if(!currentExName){ switchTab('exlibrary'); return; }
+  const name = currentExName;
+  const hist = getExerciseHistory(name);
+  const lib = exLibrary[name] || {};
+  const pr = hist.length ? Math.max(...hist.map(h => h.maxWeight)) : null;
+  const prSession = pr !== null ? hist.find(h => h.maxWeight === pr) : null;
+  const lastSession = hist.length ? hist[hist.length-1] : null;
+  const trend = getTrend(hist);
+  el('section-exdetail').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">
+      <button class="btn btn-sm" onclick="switchTab('exlibrary')">← Library</button>
+      <span style="font-size:16px;font-weight:600;">${name}</span>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+        <div class="card-title" style="margin-bottom:0;">About this exercise</div>
+        <button class="btn btn-sm" onclick="editExDescription()" id="ex-edit-btn">✎ Edit</button>
+      </div>
+      <div id="ex-desc-view">
+        ${lib.description ? `<div style="font-size:13px;color:#444;margin-bottom:6px;">${lib.description}</div>` : `<div style="font-size:13px;color:#bbb;margin-bottom:6px;">No description yet — tap Edit to add one.</div>`}
+        ${lib.notes ? `<div style="font-size:12px;color:#888;background:#f7f7f5;border-radius:8px;padding:8px 10px;">${lib.notes}</div>` : ''}
+      </div>
+      <div id="ex-desc-edit" style="display:none;">
+        <div style="margin-bottom:8px;"><label style="font-size:11px;color:#888;font-weight:600;display:block;margin-bottom:3px;">DESCRIPTION</label>
+          <input type="text" id="ex-desc-input" value="${(lib.description||'').replace(/"/g,'&quot;')}" placeholder="e.g. Compound push movement targeting chest and triceps" style="font-size:13px;"></div>
+        <div style="margin-bottom:10px;"><label style="font-size:11px;color:#888;font-weight:600;display:block;margin-bottom:3px;">FORM NOTES</label>
+          <textarea id="ex-notes-input" rows="3" style="font-size:13px;border-radius:8px;padding:8px 10px;border:1px solid #ccc;font-family:inherit;width:100%;resize:none;">${lib.notes||''}</textarea></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="saveExDescription('${name.replace(/'/g,"\\'")}')">Save</button>
+          <button class="btn btn-sm" onclick="cancelExDescription()">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="metrics" style="margin-bottom:1rem;">
+      <div class="metric"><div class="metric-label">🏆 Best Weight</div><div class="metric-value">${pr && pr > 0 ? pr+' lbs' : '—'}</div><div class="metric-sub">${prSession ? prSession.dateStr : ''}</div></div>
+      <div class="metric"><div class="metric-label">📅 Sessions</div><div class="metric-value">${hist.length}</div><div class="metric-sub">${lastSession ? 'last '+lastSession.dateStr : 'none yet'}</div></div>
+      <div class="metric"><div class="metric-label">📊 Trend</div><div class="metric-value">${trend ? trend.icon : '—'}</div><div class="metric-sub">${trend ? trend.label : 'need 3+ sessions'}</div></div>
+      <div class="metric"><div class="metric-label">💪 Last Volume</div><div class="metric-value">${lastSession ? lastSession.volume.toLocaleString() : '—'}</div><div class="metric-sub">${lastSession ? 'lbs total' : ''}</div></div>
+    </div>
+    ${hist.length >= 2 ? `
+    <div class="card">
+      <div class="card-title">Max weight per session</div>
+      <div style="position:relative;height:180px;"><canvas id="ex-weight-chart" role="img" aria-label="Weight progression chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Volume per session <span style="font-size:11px;color:#aaa;font-weight:400;">(sets × reps × weight)</span></div>
+      <div style="position:relative;height:160px;"><canvas id="ex-volume-chart" role="img" aria-label="Volume progression chart"></canvas></div>
+    </div>` : `<div class="card" style="text-align:center;padding:1.5rem;"><div style="font-size:13px;color:#888;">${hist.length===1?'Complete at least 2 sessions to see progression charts.':'No sessions logged yet for this exercise.'}</div></div>`}
+    ${hist.length ? `<div class="card">
+      <div class="card-title">Session log</div>
+      ${[...hist].reverse().map(h => `<div style="padding:10px 0;border-bottom:0.5px solid #f0f0f0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:13px;font-weight:600;">${h.dateStr}</div>
+          <div style="font-size:12px;color:#888;">Vol: ${h.volume.toLocaleString()} lbs</div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">
+          ${h.sets.map(s => `<span style="font-size:12px;background:#f7f7f5;padding:3px 10px;border-radius:6px;color:#444;">R${s.round}: ${s.weight ? s.weight+' lbs × ' : ''}${s.reps} reps</span>`).join('')}
+        </div>
+      </div>`).join('')}
+    </div>` : ''}`;
+  if(hist.length >= 2) { setTimeout(() => { drawExWeightChart(hist); drawExVolumeChart(hist); }, 60); }
+}
+
+function editExDescription() {
+  el('ex-desc-view').style.display='none'; el('ex-desc-edit').style.display='block'; el('ex-edit-btn').style.display='none';
+}
+function cancelExDescription() {
+  el('ex-desc-view').style.display='block'; el('ex-desc-edit').style.display='none'; el('ex-edit-btn').style.display='';
+}
+function saveExDescription(name) {
+  const desc = el('ex-desc-input').value.trim();
+  const notes = el('ex-notes-input').value.trim();
+  if(!exLibrary[name]) exLibrary[name] = {};
+  exLibrary[name].description = desc; exLibrary[name].notes = notes;
+  if(!plan.exLibrary) plan.exLibrary = {};
+  plan.exLibrary[name] = {description:desc, notes};
+  savePlan(); renderExDetail();
+}
+
+function drawExWeightChart(hist) {
+  const canvas = el('ex-weight-chart'); if(!canvas) return;
+  if(exDetailChart1){exDetailChart1.destroy();exDetailChart1=null;}
+  const labels = hist.map(h => h.dateStr);
+  const data = hist.map(h => h.maxWeight);
+  const n=hist.length,sumX=hist.reduce((a,_,i)=>a+i,0),sumY=data.reduce((a,v)=>a+v,0),sumXY=hist.reduce((a,_,i)=>a+i*data[i],0),sumX2=hist.reduce((a,_,i)=>a+i*i,0);
+  const slope=(n*sumXY-sumX*sumY)/(n*sumX2-sumX*sumX);
+  const intercept=(sumY-slope*sumX)/n;
+  const trendData=hist.map((_,i)=>parseFloat((slope*i+intercept).toFixed(1)));
+  const trendColor=slope>0.5?'#1D9E75':slope<-0.5?'#D85A30':'#888';
+  const minV=Math.min(...data),maxV=Math.max(...data),pad=(maxV-minV)*0.3||5;
+  exDetailChart1=new Chart(canvas.getContext('2d'),{type:'line',data:{labels,datasets:[
+    {label:'Max weight',data,borderColor:'#461D7C',backgroundColor:'rgba(70,29,124,0.08)',borderWidth:2,pointRadius:5,pointBackgroundColor:'#461D7C',tension:0.3,fill:true,datalabels:{display:true,anchor:'end',align:'top',font:{size:10,weight:'600'},color:'#461D7C',formatter:v=>v+' lbs'}},
+    {label:'Trend',data:trendData,borderColor:trendColor,borderWidth:1.5,borderDash:[4,3],pointRadius:0,tension:0,fill:false,datalabels:{display:false}}
+  ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:20}},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.raw} lbs`}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10},callback:v=>v+' lbs'},min:Math.floor(minV-pad),max:Math.ceil(maxV+pad)}}}});
+}
+
+function drawExVolumeChart(hist) {
+  const canvas = el('ex-volume-chart'); if(!canvas) return;
+  if(exDetailChart2){exDetailChart2.destroy();exDetailChart2=null;}
+  const labels=hist.map(h=>h.dateStr),data=hist.map(h=>h.volume),maxV=Math.max(...data);
+  exDetailChart2=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels,datasets:[{label:'Volume',data,backgroundColor:data.map((v,i)=>i===0?'rgba(83,74,183,0.6)':v>=data[i-1]?'rgba(29,158,117,0.75)':'rgba(216,90,48,0.75)'),borderRadius:4,borderSkipped:false,datalabels:{display:false}}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.raw.toLocaleString()} lbs volume`}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45}},y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:10},callback:v=>v.toLocaleString()},min:0,suggestedMax:maxV*1.15}}}});
+}
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 loadAll();
